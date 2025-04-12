@@ -12,6 +12,7 @@ This document establishes the coding standards and style guides for the AI-power
 - **YAGNI (You Aren’t Gonna Need It)**: Avoid speculative features or optimizations unless explicitly required.
 - **Error Handling**: Implement robust error handling for all operations, including API calls, file processing, and user inputs.
 - **Testing**: Achieve at least 80% code coverage with unit and integration tests for critical functionality.
+- **Keep files below 300 lines of code** and split functionality when approaching this limit
 
 ## Frontend: Next.js with TypeScript and TailwindCSS v4
 

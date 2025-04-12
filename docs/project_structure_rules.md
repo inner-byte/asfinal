@@ -18,7 +18,7 @@ Both repositories are hosted on GitHub, with CI/CD pipelines configured via GitH
 ### Directory Structure
 
 ```
-subtitle-generator-frontend/
+abs-ui/
 ├── app/                    # Next.js app directory (App Router)
 │   ├── layout.tsx          # Root layout for shared UI components
 │   ├── page.tsx            # Home page (main entry point)
@@ -56,11 +56,11 @@ subtitle-generator-frontend/
 ├── types/                  # TypeScript type definitions
 │   ├── video.ts            # Types for video metadata
 │   └── subtitle.ts         # Types for subtitle data (e.g., VTT, SRT, ASS)
-├── .eslintrc.js            # ESLint configuration
+├── .eslintrc.ts            # ESLint configuration
 ├── .prettierrc             # Prettier configuration
-├── tailwind.config.js      # TailwindCSS configuration
+├── tailwind.config.ts      # TailwindCSS configuration
 ├── tsconfig.json           # TypeScript configuration
-├── next.config.js          # Next.js configuration
+├── next.config.ts          # Next.js configuration
 ├── package.json            # Dependencies and scripts
 └── README.md               # Project setup and usage instructions
 ```
@@ -70,7 +70,7 @@ subtitle-generator-frontend/
 - **App Router**: Use Next.js 15’s App Router (`app/` directory) for modern routing and layout management, ensuring optimal performance and SEO.
 - **Feature-Based Structure**: Organize pages and components by feature (`video-upload`, `subtitle-preview`, `export`) to maintain modularity and single responsibility.
 - **TypeScript**: Define types in the `types/` directory for video and subtitle data, ensuring type safety across the application.
-- **TailwindCSS v4**: Centralize custom themes (e.g., dark gray base, gradient accents) in `tailwind.config.js`. Use utility classes for 90% of styling, reserving `styles/` for complex animations.
+- **TailwindCSS v4**: Centralize custom themes (e.g., dark gray base, gradient accents) in `tailwind.config.ts`. Use utility classes for 90% of styling, reserving `styles/` for complex animations.
 - **Components**: Keep components small and focused; extract shared UI elements (e.g., `Button`, `Loader`) into `components/UI/`.
 - **Hooks**: Encapsulate reusable logic (e.g., subtitle synchronization, video upload) in custom hooks for better maintainability.
 - **Static Assets**: Store static files in `public/`, ensuring efficient access for images and icons.
@@ -81,7 +81,7 @@ subtitle-generator-frontend/
 ### Directory Structure
 
 ```
-subtitle-generator-backend/
+abs-server/
 ├── src/                    # Source code
 │   ├── config/             # Configuration files
 │   │   ├── appwrite.ts     # Appwrite client configuration
