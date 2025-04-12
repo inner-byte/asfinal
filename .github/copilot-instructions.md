@@ -8,6 +8,7 @@
   - `coding_standards_style_guides.md` - For understanding coding practices to follow
   - `progress.md` - For understanding current development status 
   - `tasks.md` - For understanding current task priorities
+## All the documents are in /docs directory and everything related to the project is in /docs directory and must be store in /docs directory
 - **Follow the phased development approach** as outlined in the roadmap, ensuring foundational components are built before advancing to more complex features
 - **Maintain consistency** with the established naming conventions, file structure, and architectural patterns
 - **Verify context before proceeding** with any implementation by explicitly referencing the specific section of documentation that supports your approach
