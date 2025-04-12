@@ -1,0 +1,247 @@
+/**
+ * Custom animations for AI-Powered Subtitle Generator
+ *
+ * Modern animations designed to complement Tailwind CSS v4
+ * and enhance the user experience with subtle motion.
+ */
+
+/* Gradient animation for backgrounds and buttons */
+.animate-gradient {
+  background-size: 200% 200%;
+  animation: gradient 8s ease infinite;
+}
+
+@keyframes gradient {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+/* Glow effect animation for interactive elements */
+.animate-glow {
+  animation: glow 2s ease-in-out infinite alternate;
+}
+
+@keyframes glow {
+  from {
+    box-shadow: 0 0 5px var(--glow-color);
+  }
+  to {
+    box-shadow: 0 0 20px color-mix(in srgb, var(--glow-color) 266%, transparent);
+  }
+}
+
+/* Fade-in animation */
+.fade-in {
+  animation: fadeIn 0.5s ease-in-out forwards;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Subtle float animation for cards */
+.float {
+  animation: float 6s ease-in-out infinite;
+}
+
+@keyframes float {
+  0% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+  100% {
+    transform: translateY(0px);
+  }
+}
+
+/* Pulse animation with customized timing */
+.pulse-subtle {
+  animation: pulseSubtle 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulseSubtle {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+/* New subtle pulse animation - more gentle than the standard pulse */
+.animate-subtle-pulse {
+  animation: subtlePulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes subtlePulse {
+  0%, 100% {
+    opacity: 1;
+    border-color: var(--color-gray-700);
+  }
+  50% {
+    opacity: 0.9;
+    border-color: var(--color-gray-600);
+  }
+}
+
+/* New subtle bounce animation - more controlled than standard bounce */
+.animate-subtle-bounce {
+  animation: subtleBounce 2s ease infinite;
+}
+
+@keyframes subtleBounce {
+  0%, 20%, 50%, 80%, 100% {
+    transform: translateY(0);
+  }
+  40% {
+    transform: translateY(-8px);
+  }
+  60% {
+    transform: translateY(-4px);
+  }
+}
+
+/* Shimmer loading animation */
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.05) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* Drop zone active animation */
+.dropzone-active {
+  animation: dropzoneGlow 2s ease-in-out infinite alternate;
+}
+
+@keyframes dropzoneGlow {
+  from {
+    box-shadow: 0 0 5px color-mix(in srgb, var(--color-primary-500) 20%, transparent), 
+                inset 0 0 5px color-mix(in srgb, var(--color-primary-500) 10%, transparent);
+  }
+  to {
+    box-shadow: 0 0 15px color-mix(in srgb, var(--color-primary-500) 40%, transparent), 
+                inset 0 0 10px color-mix(in srgb, var(--color-primary-500) 20%, transparent);
+  }
+}
+
+/* Scale transition for buttons and interactive elements */
+.scale-transition {
+  transition: transform 0.15s ease-in-out;
+}
+
+.scale-transition:hover {
+  transform: scale(1.05);
+}
+
+.scale-transition:active {
+  transform: scale(0.98);
+}
+
+/* Slide-in animation variants */
+.slide-in-left {
+  animation: slideInLeft 0.4s forwards;
+}
+
+.slide-in-right {
+  animation: slideInRight 0.4s forwards;
+}
+
+.slide-in-up {
+  animation: slideInUp 0.4s forwards;
+}
+
+.slide-in-down {
+  animation: slideInDown 0.4s forwards;
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Progress bar animation */
+.progress-bar-animated {
+  background-image: linear-gradient(
+    90deg,
+    var(--color-primary-500) 0%,
+    var(--color-accent-purple) 50%,
+    var(--color-primary-500) 100%
+  );
+  background-size: 200% 100%;
+  animation: progressGradient 2s linear infinite;
+}
+
+@keyframes progressGradient {
+  0% {
+    background-position: 0% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}

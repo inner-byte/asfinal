@@ -18,9 +18,9 @@ This document outlines all tasks for the AI-powered subtitle generator web appli
 
 ### Frontend Initial Setup
 - ✅ Initialize Next.js project with TypeScript and TailwindCSS v4
-- 🔄 Set up project structure according to `project_structure_rules.md`
-- ⏳ Create basic layout with placeholder components
-- ⏳ Implement basic routing using Next.js App Router
+- ✅ Set up project structure according to `project_structure_rules.md`
+- ✅ Create basic layout with placeholder components
+- 🔄 Implement basic routing using Next.js App Router
 
 ### Backend Initial Setup
 - ✅ Initialize Express project with TypeScript
@@ -35,8 +35,8 @@ This document outlines all tasks for the AI-powered subtitle generator web appli
 - ✅ Implement `appwriteService.ts` for database and storage interactions
 
 ### Video Upload Feature
-- ⏳ Create frontend components for video upload (DragDrop.tsx, ProgressBar.tsx)
-- ⏳ Implement `useVideoUpload` hook for handling uploads
+- 🔄 Create frontend components for video upload (DragDrop.tsx, ProgressBar.tsx)
+- ✅ Implement `useVideoUpload` hook for handling uploads
 - ✅ Create backend API endpoints for video upload
 - ✅ Implement video validation and streaming to Appwrite storage
 - ⏳ Add frontend-backend integration tests for upload workflow

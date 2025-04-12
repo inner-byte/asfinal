@@ -1,26 +1,271 @@
+/* 
+ * AI-Powered Subtitle Generator CSS
+ * Using Tailwind CSS v4 with modern CSS features
+ */
+
+/* In v4, we use @import "tailwindcss" instead of @tailwind directives */
 @import "tailwindcss";
 
+/* Import our custom animations */
+@import "../styles/animations.css";
+
+/* 
+ * CSS Variables for our design system 
+ * In Tailwind CSS v4, these will be automatically picked up and used
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Base colors */
+  --color-gray-50: #f9fafb;
+  --color-gray-100: #f3f4f6;
+  --color-gray-200: #e5e7eb;
+  --color-gray-300: #d1d5db;
+  --color-gray-400: #9ca3af;
+  --color-gray-500: #6b7280;
+  --color-gray-600: #4b5563;
+  --color-gray-700: #374151;
+  --color-gray-800: #1f2937;
+  --color-gray-900: #111827;
+  --color-gray-950: #080a10;
+  
+  /* Primary colors */
+  --color-primary-50: #f0faff;
+  --color-primary-100: #e0f4fe;
+  --color-primary-200: #bae8fd;
+  --color-primary-300: #7dd5fc;
+  --color-primary-400: #39bef8;
+  --color-primary-500: #0ea5e9;
+  --color-primary-600: #0284c7;
+  --color-primary-700: #036ba1;
+  --color-primary-800: #075985;
+  --color-primary-900: #0c4a6e;
+  --color-primary-950: #082f49;
+  
+  /* Secondary colors */
+  --color-secondary-50: #fdf4ff;
+  --color-secondary-100: #fae8ff;
+  --color-secondary-200: #f5d0fe;
+  --color-secondary-300: #f0abfc;
+  --color-secondary-400: #e879f9;
+  --color-secondary-500: #d946ef;
+  --color-secondary-600: #c026d3;
+  --color-secondary-700: #a21caf;
+  --color-secondary-800: #86198f;
+  --color-secondary-900: #701a75;
+  --color-secondary-950: #4a044e;
+  
+  /* Accent colors */
+  --color-accent-purple: #8b5cf6;
+  --color-accent-blue: #3b82f6;
+  --color-accent-cyan: #06b6d4;
+  --color-accent-teal: #14b8a6;
+  --color-accent-green: #22c55e;
+  --color-accent-pink: #ec4899;
+  --color-accent-rose: #f43f5e;
+  
+  /* Semantic colors */
+  --color-success: #22c55e;
+  --color-warning: #eab308;
+  --color-error: #ef4444;
+  
+  /* Gradient colors */
+  --gradient-primary-start: #0ea5e9;
+  --gradient-primary-end: #8b5cf6;
+  --gradient-secondary-start: #8b5cf6;
+  --gradient-secondary-end: #ec4899;
+  --gradient-accent-start: #06b6d4;
+  --gradient-accent-end: #14b8a6;
+  
+  /* Core UI variables */
+  --shadow-color: rgba(0, 0, 0, 0.1);
+  --glow-color: rgba(14, 165, 233, 0.3);
+  
+  /* Animation timings */
+  --transition-fast: 150ms;
+  --transition-normal: 300ms;
+  --transition-slow: 500ms;
+  
+  /* Border radii */
+  --radius-sm: 0.125rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
+  --radius-2xl: 1rem;
+  --radius-3xl: 1.5rem;
+  --radius-4xl: 2rem;
+  --radius-5xl: 2.5rem;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+/* Dark mode is our default theme */
+:root {
+  /* Background and foreground */
+  --background-primary: var(--color-gray-900);
+  --background-secondary: var(--color-gray-800);
+  --foreground-primary: var(--color-gray-50);
+  --foreground-secondary: var(--color-gray-200);
+  
+  /* Optimized shadow for dark mode */
+  --shadow-color: rgba(0, 0, 0, 0.3);
+  
+  /* Reduced opacity for hover effects */
+  --hover-opacity: 0.9;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* Optional light mode support for future use */
+.light {
+  --background-primary: var(--color-gray-50);
+  --background-secondary: var(--color-gray-100);
+  --foreground-primary: var(--color-gray-900);
+  --foreground-secondary: var(--color-gray-700);
+  --shadow-color: rgba(0, 0, 0, 0.1);
+  --hover-opacity: 0.8;
+}
+
+/* 
+ * Tailwind CSS v4 uses the @theme directive to
+ * make theme variables available as utility classes
+ */
+@theme {
+  /* Fonts */
+  --font-sans: "Inter", "Poppins", system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, monospace;
+  
+  /* Colors */
+  --color-background: var(--background-primary);
+  --color-foreground: var(--foreground-primary);
+  
+  /* Design tokens */
+  --color-primary: var(--color-primary-500);
+  --color-secondary: var(--color-secondary-500);
+  
+  /* Border radius */
+  --radius-default: var(--radius-lg);
+}
+
+/* Base styles */
+html {
+  scroll-behavior: smooth;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+  background: var(--background-primary);
+  color: var(--foreground-primary);
+  min-height: 100dvh;
+  transition: background-color var(--transition-normal), color var(--transition-normal);
+  @apply antialiased;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-weight: 600;
+  letter-spacing: -0.025em;
+}
+
+/* Focus styles for better accessibility */
+:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--color-primary-500);
+}
+
+/* Custom component classes */
+.container-custom {
+  width: 100%;
+  max-width: 80rem;
+  margin-inline: auto;
+  padding-inline: 1rem;
+}
+
+@media (min-width: 640px) {
+  .container-custom {
+    padding-inline: 1.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .container-custom {
+    padding-inline: 2rem;
+  }
+}
+
+/* Common UI patterns */
+.card {
+  background-color: var(--background-secondary);
+  border-radius: var(--radius-xl);
+  border: 1px solid color-mix(in srgb, var(--background-secondary) 70%, white);
+  box-shadow: 0 4px 6px -1px var(--shadow-color);
+  padding: 1.5rem;
+}
+
+/* Button styles */
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-lg);
+  font-weight: 500;
+  transition: all var(--transition-normal);
+}
+
+.button:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--color-primary-500);
+}
+
+.button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.button-primary {
+  background-color: var(--color-primary-500);
+  color: white;
+}
+
+.button-primary:hover {
+  background-color: var(--color-primary-600);
+}
+
+.button-secondary {
+  background-color: var(--background-secondary);
+  color: var(--foreground-primary);
+}
+
+.button-secondary:hover {
+  background-color: color-mix(in srgb, var(--background-secondary) 90%, white);
+}
+
+.button-gradient {
+  background-image: linear-gradient(to right, var(--gradient-primary-start), var(--gradient-primary-end));
+  background-size: 200% 200%;
+  color: white;
+  transform: scale(1);
+  transition: transform 0.15s ease-in-out, background-position 0.3s ease;
+}
+
+.button-gradient:hover {
+  transform: scale(1.05);
+  background-position: 100% 50%;
+}
+
+/* Form elements */
+.input {
+  background-color: var(--background-secondary);
+  color: var(--foreground-primary);
+  border: 1px solid color-mix(in srgb, var(--background-secondary) 70%, white);
+  border-radius: var(--radius-lg);
+  padding: 0.5rem 1rem;
+  transition: all var(--transition-fast);
+}
+
+.input:focus {
+  border-color: var(--color-primary-500);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary-500) 20%, transparent);
+  outline: none;
+}
+
+/* Text styles */
+.text-gradient {
+  background-clip: text;
+  color: transparent;
+  background-image: linear-gradient(to right, var(--gradient-primary-start), var(--gradient-primary-end));
 }

@@ -6,7 +6,7 @@ This document tracks the development progress, challenges encountered, solutions
 
 | Phase | Description | Status | Completion % |
 |-------|-------------|--------|-------------|
-| 1 | Project Setup and Initial Development | In Progress | 35% |
+| 1 | Project Setup and Initial Development | In Progress | 45% |
 | 2 | Real-time Subtitle Preview and Synchronization | Not Started | 0% |
 | 3 | Subtitle Export and Format Conversion | Not Started | 0% |
 | 4 | UI/UX Enhancement and Optimization | Not Started | 0% |
@@ -23,7 +23,7 @@ This document tracks the development progress, challenges encountered, solutions
 | M1.1 | Set up the development environment | In Progress | 80% |
 | M1.2 | Implement video upload functionality | In Progress | 60% |
 | M1.3 | Integrate Gemini-flash-2.0 model | Not Started | 0% |
-| M1.4 | Develop initial frontend interface | Not Started | 0% |
+| M1.4 | Develop initial frontend interface | In Progress | 60% |
 
 ### Recently Completed Tasks
 - Created `abs-ui` and `abs-server` repositories with initial Next.js and Express projects
@@ -38,17 +38,23 @@ This document tracks the development progress, challenges encountered, solutions
 - Configured storage buckets for video and subtitle files with appropriate security settings
 - Implemented backend API endpoints for video upload, streaming, and deletion
 - Added file upload handling functionality with multer middleware
+- Set up frontend project structure according to `project_structure_rules.md`
+- Created basic layout with placeholder components following the "lipsync-2" design
+- Extracted placeholder components into proper modular component files:
+  - VideoUpload.tsx - For video file uploads with drag and drop support
+  - SubtitlePreview.tsx - For displaying video with generated subtitles
+  - ExportOptions.tsx - For subtitle format selection and downloading
 
 ### In-Progress Tasks
 - Configure ESLint and Prettier in both repositories
-- Set up frontend project structure according to `project_structure_rules.md`
 - Implement frontend components for video upload (DragDrop.tsx, ProgressBar.tsx)
+- Implement basic routing using Next.js App Router
 
 ### Upcoming Tasks
-1. Complete frontend structure with placeholder components
-2. Implement `useVideoUpload` hook for handling uploads
-3. Configure GitHub Actions for CI/CD pipelines
-4. Implement video processing and validation
+1. Implement `useVideoUpload` hook for handling uploads
+2. Configure GitHub Actions for CI/CD pipelines
+3. Implement video processing and validation
+4. Integrate Plyr video player with basic subtitle support
 
 ### Challenges and Solutions
 
@@ -58,6 +64,8 @@ This document tracks the development progress, challenges encountered, solutions
 | April 12, 2025 | Appwrite database methods called with incorrect number of arguments | Added database ID parameter to all database calls (createDocument, getDocument, listDocuments) | Resolved |
 | April 12, 2025 | TypeScript error with cors module declaration | Created custom type declaration for cors module | Resolved |
 | April 12, 2025 | Handling large video file uploads (up to 4GB) efficiently | Implemented streaming approach with temporary file storage and cleaned up after upload | Resolved |
+| April 12, 2025 | Creating UI components that match the "lipsync-2" design reference | Implemented a modern UI with dark theme, gradient accents, and subtle animations following the design system | Resolved |
+| April 12, 2025 | TypeScript error in components index.ts | Fixed UI/index.ts to properly export a type and constant to make it a valid module | Resolved |
 
 ### Implementation Notes
 
@@ -84,13 +92,18 @@ This document tracks the development progress, challenges encountered, solutions
 - Created typed interfaces for videos and subtitles to ensure type safety
 - Chose multer for handling file uploads with 4GB file size limit
 - Implemented temporary file storage with cleanup to handle large uploads efficiently
+- Created modern UI following the "lipsync-2" design with custom animations and gradient elements
+- Used Inter and Poppins fonts as specified in the project goals
+- Organized components using feature-based architecture for better maintainability:
+  - Each feature has its own directory (VideoUpload, SubtitlePreview, Export)
+  - Created index.ts files for clean exports and imports
 
 ### Next Steps
-1. Complete the frontend structure with components for video upload
-2. Implement the video upload functionality in the frontend
-3. Research and implement the Gemini-flash-2.0 integration via Vertex API
-4. Connect frontend and backend for the complete video upload workflow
-5. Implement testing for the video upload feature
+1. Implement `useVideoUpload` hook for handling uploads
+2. Create the DragDrop and ProgressBar components for the video upload feature
+3. Connect frontend components to their corresponding backend API endpoints
+4. Research and implement the Gemini-flash-2.0 integration via Vertex API
+5. Begin implementation of the Plyr video player integration
 
 ### Blockers
 - Vertex API access needs to be set up for Gemini-flash-2.0 integration
@@ -100,7 +113,7 @@ This document tracks the development progress, challenges encountered, solutions
 ### [DATE: April 12, 2025]
 
 #### Summary
-Project initialization completed. Backend structure set up with Express and TypeScript. Frontend initialized with Next.js and TailwindCSS v4. Appwrite integration completed with database collections and storage buckets for videos and subtitles. Backend API endpoints implemented for video upload functionality.
+Project initialization completed. Backend structure set up with Express and TypeScript. Frontend initialized with Next.js and TailwindCSS v4. Appwrite integration completed with database collections and storage buckets for videos and subtitles. Backend API endpoints implemented for video upload functionality. Basic layout with placeholder components created following the "lipsync-2" design.
 
 #### Details
 - Set up the project structure for both frontend and backend
@@ -113,3 +126,9 @@ Project initialization completed. Backend structure set up with Express and Type
 - Implemented complete video upload workflow with streaming support
 - Added multer middleware for handling file uploads
 - Updated environment variables with Appwrite configuration
+- Created modern UI layout with placeholder components following the "lipsync-2" design reference
+- Implemented placeholder components for VideoUpload, SubtitlePreview, and Export feature areas
+- Added custom animations for interactive elements like the upload drop zone
+- Structured the UI with a multi-step workflow that guides users through the subtitle generation process
+- Extracted placeholder components into dedicated files with proper TypeScript types
+- Fixed module error in UI/index.ts by adding proper exports
