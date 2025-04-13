@@ -47,7 +47,7 @@ export default function RootLayout({
                         ABS
                       </div>
                       <h1 className="font-medium text-lg tracking-tight">
-                        AI Subtitle Generator
+                        Subtitle Generator
                       </h1>
                     </Link>
                   </div>

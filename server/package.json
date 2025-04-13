@@ -1,5 +1,5 @@
 {
-  "name": "abs-server",
+  "name": "server",
   "version": "1.0.0",
   "description": "Backend for AI-Powered Subtitle Generator",
   "main": "dist/index.js",

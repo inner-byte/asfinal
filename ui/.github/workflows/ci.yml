@@ -4,11 +4,11 @@ on:
   push:
     branches: [ main ]
     paths:
-      - 'abs-ui/**'
+      - 'ui/**'
   pull_request:
     branches: [ main ]
     paths:
-      - 'abs-ui/**'
+      - 'ui/**'
 
 jobs:
   build:
@@ -16,7 +16,7 @@ jobs:
     
     defaults:
       run:
-        working-directory: ./abs-ui
+        working-directory: ./ui
         
     steps:
     - uses: actions/checkout@v4
@@ -26,7 +26,7 @@ jobs:
       with:
         node-version: '20'
         cache: 'npm'
-        cache-dependency-path: './abs-ui/package-lock.json'
+        cache-dependency-path: './ui/package-lock.json'
     
     - name: Install dependencies
       run: npm ci

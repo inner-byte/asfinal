@@ -14,7 +14,7 @@
 - **Verify context before proceeding** with any implementation by explicitly referencing the specific section of documentation that supports your approach
 
 ## 🏗️ Repository Architecture
-- **Respect the repository split** between `abs-ui` (frontend) and `abs-server` (backend)
+- **Respect the repository split** between `ui` (frontend) and `server` (backend)
 - **Follow established directory structures**:
   - **Frontend**: Feature-based organization within the Next.js App Router structure
   - **Backend**: MVC-inspired pattern with controllers, services, and routes

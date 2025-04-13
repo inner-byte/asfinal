@@ -11,7 +11,7 @@ This document outlines all tasks for the AI-powered subtitle generator web appli
 ## Phase 1: Project Setup and Initial Development
 
 ### Repository Setup
-- ✅ Create `abs-ui` and `abs-server` repositories with initial Next.js and Express projects
+- ✅ Create `ui` and `server` repositories with initial Next.js and Express projects
 - ✅ Configure ESLint, Prettier, and TypeScript in both repositories
 - ✅ Set up GitHub Actions for CI/CD pipelines
 - ✅ Create development environment setup documentation

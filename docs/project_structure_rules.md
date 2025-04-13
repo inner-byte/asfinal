@@ -8,8 +8,8 @@ This document outlines the project structure rules for the AI-powered subtitle g
 
 The project is split into two main repositories to separate concerns between the frontend and backend:
 
-- `abs-ui`: Contains the Next.js application.
-- `abs-server`: Contains the Node.js/Express application.
+- `ui`: Contains the Next.js application.
+- `server`: Contains the Node.js/Express application.
 
 Both repositories are hosted on GitHub, with CI/CD pipelines configured via GitHub Actions.
 
@@ -18,7 +18,7 @@ Both repositories are hosted on GitHub, with CI/CD pipelines configured via GitH
 ### Directory Structure
 
 ```
-abs-ui/
+ui/
 ├── app/                    # Next.js app directory (App Router)
 │   ├── layout.tsx          # Root layout for shared UI components
 │   ├── page.tsx            # Home page (main entry point)
@@ -81,7 +81,7 @@ abs-ui/
 ### Directory Structure
 
 ```
-abs-server/
+server/
 ├── src/                    # Source code
 │   ├── config/             # Configuration files
 │   │   ├── appwrite.ts     # Appwrite client configuration

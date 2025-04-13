@@ -1,6 +1,6 @@
 # Development Environment Setup Guide
 
-This document provides instructions for setting up the development environment for the AI-Powered Subtitle Generator project, covering both the frontend (abs-ui) and backend (abs-server).
+This document provides instructions for setting up the development environment for the AI-Powered Subtitle Generator project, covering both the frontend (ui) and backend (server).
 
 ## Prerequisites
 
@@ -8,7 +8,7 @@ This document provides instructions for setting up the development environment f
 - npm (v10 or later)
 - Git
 
-## Frontend Setup (abs-ui)
+## Frontend Setup (ui)
 
 The frontend is built with Next.js 15, React 19, TypeScript, and TailwindCSS 4.
 
@@ -17,7 +17,7 @@ The frontend is built with Next.js 15, React 19, TypeScript, and TailwindCSS 4.
 1. Clone the repository:
    ```bash
    git clone <repository-url>
-   cd <repository-directory>/abs-ui
+   cd <repository-directory>/ui
    ```
 
 2. Install dependencies:
@@ -47,7 +47,7 @@ The frontend is built with Next.js 15, React 19, TypeScript, and TailwindCSS 4.
    - `npm run format`: Format code using Prettier
    - `npm run format:check`: Check code formatting without modifying files
 
-## Backend Setup (abs-server)
+## Backend Setup (server)
 
 The backend is built with Node.js, Express, TypeScript, and integrates with Appwrite.
 
@@ -55,7 +55,7 @@ The backend is built with Node.js, Express, TypeScript, and integrates with Appw
 
 1. Navigate to the backend directory:
    ```bash
-   cd <repository-directory>/abs-server
+   cd <repository-directory>/server
    ```
 
 2. Install dependencies:

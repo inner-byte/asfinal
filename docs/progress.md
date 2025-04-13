@@ -26,7 +26,7 @@ This document tracks the development progress, challenges encountered, solutions
 | M1.4 | Develop initial frontend interface | In Progress | 70% |
 
 ### Recently Completed Tasks
-- Created `abs-ui` and `abs-server` repositories with initial Next.js and Express projects
+- Created `ui` and `server` repositories with initial Next.js and Express projects
 - Initialized Next.js project with TypeScript and TailwindCSS v4
 - Initialized Express project with TypeScript
 - Set up backend project structure according to `project_structure_rules.md`

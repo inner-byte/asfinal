@@ -26,8 +26,8 @@ This application generates accurate and real-time subtitles for videos using Goo
 
 The project is split into two repositories:
 
-- **`abs-ui`** - Next.js frontend application 
-- **`abs-server`** - Express backend API
+- **`ui`** - Next.js frontend application 
+- **`server`** - Express backend API
 
 ## Technology Stack
 
@@ -55,11 +55,11 @@ The project is split into two repositories:
 
 ### Setup Instructions
 
-#### Frontend (abs-ui)
+#### Frontend (ui)
 ```bash
 # Clone the repository
 git clone https://github.com/inner-byte/asfinal.git
-cd abs-ui
+cd ui
 
 # Install dependencies
 npm install
@@ -72,11 +72,11 @@ cp .env.example .env.local
 npm run dev
 ```
 
-#### Backend (abs-server)
+#### Backend (server)
 ```bash
 # Clone the repository
 git clone https://github.com/your-org/asfinal.git
-cd abs-server
+cd server
 
 # Install dependencies
 npm install
