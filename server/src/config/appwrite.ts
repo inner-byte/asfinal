@@ -74,7 +74,7 @@ export const ensureBucketExists = async (bucketId: string, bucketName: string) =
       ],
       true, // File security
       true, // Enabled
-      30000000, // Maximum file size (30MB is the maximum allowed by Appwrite)
+      2147483648, // Maximum file size (2GB - Appwrite's actual limit)
       ['video/*', 'application/octet-stream'], // Allowed file extensions
     );
     console.log(`Bucket ${bucketId} created successfully`);

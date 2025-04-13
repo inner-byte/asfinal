@@ -39,7 +39,8 @@ app.get('/', (req: Request, res: Response) => {
     endpoints: {
       health: '/health',
       api: '/api',
-      videos: '/api/videos'
+      videos: '/api/videos',
+      subtitles: '/api/subtitles'
     }
   });
 });

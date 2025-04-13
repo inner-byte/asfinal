@@ -6,7 +6,7 @@ This document tracks the development progress, challenges encountered, solutions
 
 | Phase | Description | Status | Completion % |
 |-------|-------------|--------|-------------|
-| 1 | Project Setup and Initial Development | In Progress | 70% |
+| 1 | Project Setup and Initial Development | In Progress | 80% |
 | 2 | Real-time Subtitle Preview and Synchronization | Not Started | 0% |
 | 3 | Subtitle Export and Format Conversion | Not Started | 0% |
 | 4 | UI/UX Enhancement and Optimization | Not Started | 0% |
@@ -21,8 +21,8 @@ This document tracks the development progress, challenges encountered, solutions
 | Milestone | Description | Status | Completion % |
 |-----------|-------------|--------|-------------|
 | M1.1 | Set up the development environment | Completed | 100% |
-| M1.2 | Implement video upload functionality | In Progress | 60% |
-| M1.3 | Integrate Gemini-flash-2.0 model | Not Started | 0% |
+| M1.2 | Implement video upload functionality | Completed | 100% |
+| M1.3 | Integrate Gemini-flash-2.0 model | Completed | 100% |
 | M1.4 | Develop initial frontend interface | In Progress | 70% |
 
 ### Recently Completed Tasks
@@ -62,14 +62,22 @@ This document tracks the development progress, challenges encountered, solutions
   - Implemented a reusable StepNavigation component for consistent user flow
   - Connected components to navigation system for state management
   - Added proper page transitions and navigation controls
+- Researched and implemented Gemini-flash-2.0 integration via Vertex API:
+  - Installed required Google Cloud and Vertex AI packages
+  - Created a configuration file for Vertex AI client
+  - Enhanced subtitle generation service with Gemini integration
+  - Implemented video transcription with timestamp generation
+  - Added retry mechanisms and error handling for API calls
+  - Updated environment variables for Google Cloud configuration
+  - Added type safety and validation for subtitle generation
 
 ### In-Progress Tasks
 - Add frontend-backend integration tests for upload workflow
+- Integrate Plyr video player with basic subtitle support
 
 ### Upcoming Tasks
-1. Research and implement the Gemini-flash-2.0 integration via Vertex API
-2. Integrate Plyr video player with basic subtitle support
-3. Begin implementation of the subtitle preview functionality
+1. Begin implementation of the subtitle preview functionality
+2. Develop the video player component with subtitle display
 
 ### Challenges and Solutions
 
@@ -81,6 +89,7 @@ This document tracks the development progress, challenges encountered, solutions
 | April 12, 2025 | Handling large video file uploads (up to 4GB) efficiently | Implemented streaming approach with temporary file storage and cleaned up after upload | Resolved |
 | April 12, 2025 | Creating UI components that match the "lipsync-2" design reference | Implemented a modern UI with dark theme, gradient accents, and subtle animations following the design system | Resolved |
 | April 12, 2025 | TypeScript error in components index.ts | Fixed UI/index.ts to properly export a type and constant to make it a valid module | Resolved |
+| April 13, 2025 | Implementing Gemini-flash-2.0 integration with proper type safety | Created a properly typed wrapper for Vertex AI client and added validation for configuration parameters | Resolved |
 
 ### Implementation Notes
 
@@ -95,9 +104,11 @@ This document tracks the development progress, challenges encountered, solutions
   - FFmpeg: Pending research
   - Bull (Redis queue): Pending research
   - Multer: Latest version for handling file uploads
+  - **Google Cloud Vertex AI**: Latest stable SDK (@google-cloud/vertexai)
+  - **Gemini-flash-2.0 Model**: Available through Vertex AI as 'gemini-2.0-flash'
 
 - **API Documentation**:
-  - Gemini-flash-2.0 via Vertex API: Pending research
+  - Gemini-flash-2.0 via Vertex API: Integrated with proper configuration
   - Appwrite: Version 1.6.1 (as of February 2025)
 
 #### Technical Decisions
@@ -109,40 +120,34 @@ This document tracks the development progress, challenges encountered, solutions
 - Implemented temporary file storage with cleanup to handle large uploads efficiently
 - Created modern UI following the "lipsync-2" design with custom animations and gradient elements
 - Used Inter and Poppins fonts as specified in the project goals
-- Organized components using feature-based architecture for better maintainability:
-  - Each feature has its own directory (VideoUpload, SubtitlePreview, Export)
-  - Created index.ts files for clean exports and imports
+- Organized components using feature-based architecture for better maintainability
+- **Added Vertex AI integration with proper type safety and validation**
+- **Implemented retry mechanism with exponential backoff for reliable API calls**
+- **Added validation for VTT format to ensure properly formatted subtitles**
 
 ### Next Steps
-1. Complete the frontend components for video upload (add any necessary refinements to DragDrop.tsx and ProgressBar.tsx)
-2. Research and implement the Gemini-flash-2.0 integration via Vertex API
-3. Begin implementation of the Plyr video player integration for subtitle preview
-4. Develop the subtitle generation service with the Vertex API for Gemini-flash-2.0
+1. Complete the frontend-backend integration tests for upload workflow
+2. Integrate Plyr video player with basic subtitle support
+3. Begin implementation of the subtitle preview functionality
+4. Develop the video player component with subtitle display
 
 ### Blockers
-- Vertex API access needs to be set up for Gemini-flash-2.0 integration
+- None at this time - Vertex API integration is complete
 
 ## Development Log
 
-### [DATE: April 12, 2025]
+### [DATE: April 13, 2025]
 
 #### Summary
-Project initialization completed. Backend structure set up with Express and TypeScript. Frontend initialized with Next.js and TailwindCSS v4. Appwrite integration completed with database collections and storage buckets for videos and subtitles. Backend API endpoints implemented for video upload functionality. Basic layout with placeholder components created following the "lipsync-2" design.
+Implemented Gemini-flash-2.0 integration via Vertex AI for subtitle generation. Created a configuration file for the Vertex AI client, enhanced the subtitle service with proper type safety, and implemented video transcription with timestamp generation. Added retry mechanisms and error handling for API calls.
 
 #### Details
-- Set up the project structure for both frontend and backend
-- Implemented error handling middleware for the backend
-- Created initial API endpoints for video management
-- Integrated Appwrite client configuration
-- Fixed several TypeScript-related issues to ensure proper typing
-- Created Appwrite database collections for videos and subtitles
-- Configured storage buckets for video files (4GB limit) and subtitle files
-- Implemented complete video upload workflow with streaming support
-- Added multer middleware for handling file uploads
-- Updated environment variables with Appwrite configuration
-- Created modern UI layout with placeholder components following the "lipsync-2" design reference
-- Implemented placeholder components for VideoUpload, SubtitlePreview, and Export feature areas
-- Added custom animations for interactive elements like the upload drop zone
-- Structured the UI with a multi-step workflow that guides users through the subtitle generation process
-- Extracted placeholder components into dedicated files with proper TypeScript types
-- Fixed module error in UI/index.ts by adding proper exports
+- Researched the latest stable versions and documentation for Google Cloud Vertex AI and Gemini-flash-2.0
+- Installed required packages (@google-cloud/vertexai) for Vertex AI integration
+- Created a configuration file (vertex.ts) for Vertex AI client with proper validation
+- Enhanced subtitle generation service (subtitleService.ts) with Gemini integration
+- Implemented video transcription functionality with timestamp generation in VTT format
+- Added retry mechanisms with exponential backoff for reliable API calls
+- Implemented validation for VTT format to ensure properly formatted subtitles
+- Updated environment variables for Google Cloud configuration
+- Added type safety and validation for subtitle generation

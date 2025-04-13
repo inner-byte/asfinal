@@ -35,17 +35,17 @@ This document outlines all tasks for the AI-powered subtitle generator web appli
 - ✅ Implement `appwriteService.ts` for database and storage interactions
 
 ### Video Upload Feature
-- 🔄 Create frontend components for video upload (DragDrop.tsx, ProgressBar.tsx)
+- ✅ Create frontend components for video upload (DragDrop.tsx, ProgressBar.tsx)
 - ✅ Implement `useVideoUpload` hook for handling uploads
 - ✅ Create backend API endpoints for video upload
 - ✅ Implement video validation and streaming to Appwrite storage
 - ⏳ Add frontend-backend integration tests for upload workflow
 
 ### Gemini Integration
-- ⏳ Configure Vertex API client for Gemini-flash-2.0 model
-- ⏳ Implement basic subtitle generation service
-- ⏳ Create API endpoints for subtitle generation requests
-- ⏳ Add error handling and retries for API calls
+- ✅ Configure Vertex API client for Gemini-flash-2.0 model
+- ✅ Implement basic subtitle generation service
+- ✅ Create API endpoints for subtitle generation requests
+- ✅ Add error handling and retries for API calls
 
 ### Video Player Integration
 - ⏳ Integrate Plyr video player with basic subtitle support
