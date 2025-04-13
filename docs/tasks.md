@@ -12,15 +12,15 @@ This document outlines all tasks for the AI-powered subtitle generator web appli
 
 ### Repository Setup
 - ✅ Create `abs-ui` and `abs-server` repositories with initial Next.js and Express projects
-- 🔄 Configure ESLint, Prettier, and TypeScript in both repositories
-- ⏳ Set up GitHub Actions for CI/CD pipelines
-- ⏳ Create development environment setup documentation
+- ✅ Configure ESLint, Prettier, and TypeScript in both repositories
+- ✅ Set up GitHub Actions for CI/CD pipelines
+- ✅ Create development environment setup documentation
 
 ### Frontend Initial Setup
 - ✅ Initialize Next.js project with TypeScript and TailwindCSS v4
 - ✅ Set up project structure according to `project_structure_rules.md`
 - ✅ Create basic layout with placeholder components
-- 🔄 Implement basic routing using Next.js App Router
+- ✅ Implement basic routing using Next.js App Router
 
 ### Backend Initial Setup
 - ✅ Initialize Express project with TypeScript

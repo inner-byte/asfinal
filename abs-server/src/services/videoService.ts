@@ -1,12 +1,20 @@
 import { ID } from 'node-appwrite';
-import { storage, databases, VIDEOS_BUCKET_ID, VIDEOS_COLLECTION_ID } from '../config/appwrite';
-import { InputFile } from 'node-appwrite/dist/inputFile';
+import { 
+  storage, 
+  databases, 
+  VIDEOS_BUCKET_ID, 
+  VIDEOS_COLLECTION_ID, 
+  DATABASE_ID,
+  createDocumentPermissions,
+  createFilePermissions 
+} from '../config/appwrite';
+// Import InputFile from the correct path
+import { InputFile } from 'node-appwrite/file';
 import fs from 'fs';
 import { Video } from '../types';
 import { AppError } from '../middleware/errorHandler';
 import { Readable } from 'stream';
 import path from 'path';
-import os from 'os';
 
 /**
  * Service for handling video operations
@@ -34,11 +42,9 @@ export class VideoService {
       // Create a unique file ID for Appwrite storage
       const fileId = ID.unique();
 
-      // Generate upload URL or token (in a real implementation, this would be used for direct uploads)
-
       // Create video entry in database with proper arguments (database ID, collection ID, document ID, data object)
       const video = await databases.createDocument(
-        process.env.APPWRITE_DATABASE_ID || '',
+        DATABASE_ID,
         VIDEOS_COLLECTION_ID,
         ID.unique(),
         {
@@ -46,9 +52,9 @@ export class VideoService {
           fileSize,
           mimeType,
           fileId,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        }
+          status: 'initialized'
+        },
+        createDocumentPermissions() // Use the permission helper function
       );
 
       return {
@@ -57,15 +63,16 @@ export class VideoService {
         fileSize: video.fileSize,
         mimeType: video.mimeType,
         fileId: video.fileId,
-        createdAt: new Date(video.createdAt),
-        updatedAt: new Date(video.updatedAt)
+        status: video.status,
+        createdAt: new Date(video.$createdAt), // Use Appwrite's built-in system field
+        updatedAt: new Date(video.$updatedAt)  // Use Appwrite's built-in system field
       };
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof AppError) {
         throw error;
       }
       console.error('Error initializing upload:', error);
-      throw new AppError('Failed to initialize video upload', 500);
+      throw new AppError(`Failed to initialize video upload: ${error.message || 'Unknown error'}`, 500);
     }
   }
 
@@ -85,45 +92,98 @@ export class VideoService {
       const video = await this.getVideoById(videoId);
 
       // Create a temp file path for buffering the stream
-      const tempFilePath = path.join(os.tmpdir(), `upload_${video.fileId}`);
+      // Use the uploads directory instead of os.tmpdir()
+      const uploadsDir = path.join(__dirname, '../../src/uploads');
+
+      // Ensure the uploads directory exists
+      if (!fs.existsSync(uploadsDir)) {
+        fs.mkdirSync(uploadsDir, { recursive: true });
+      }
+
+      const tempFilePath = path.join(uploadsDir, `upload_${video.fileId}`);
+      console.log(`Writing file to: ${tempFilePath}`);
+
       const writeStream = fs.createWriteStream(tempFilePath);
 
       // Stream the file to disk first (buffer)
       await new Promise<void>((resolve, reject) => {
         fileStream.pipe(writeStream)
-          .on('finish', () => resolve())
-          .on('error', (err) => reject(new AppError(`Error writing file: ${err.message}`, 500)));
+          .on('finish', () => {
+            console.log(`File successfully written to ${tempFilePath}`);
+            resolve();
+          })
+          .on('error', (err) => {
+            console.error(`Error writing file to ${tempFilePath}:`, err);
+            reject(new AppError(`Error writing file: ${err.message}`, 500));
+          });
       });
 
+      // Verify the file exists and has content
+      if (!fs.existsSync(tempFilePath)) {
+        throw new AppError(`Temporary file was not created at ${tempFilePath}`, 500);
+      }
+
+      const fileStats = fs.statSync(tempFilePath);
+      console.log(`File size: ${fileStats.size} bytes`);
+
+      if (fileStats.size === 0) {
+        throw new AppError('Uploaded file is empty', 400);
+      }
+
       // Upload the file from disk to Appwrite storage
-      // Use InputFile.fromPath to create a File object from the file path
-      const file = InputFile.fromPath(tempFilePath, fileName);
-      await storage.createFile(
-        VIDEOS_BUCKET_ID,
-        video.fileId,
-        file,
-        undefined  // No specific permissions
-      );
+      try {
+        // Use InputFile.fromPath to create a File object from the file path
+        const file = InputFile.fromPath(tempFilePath, fileName);
+        console.log(`Uploading file to Appwrite bucket: ${VIDEOS_BUCKET_ID}, fileId: ${video.fileId}`);
+
+        await storage.createFile(
+          VIDEOS_BUCKET_ID,
+          video.fileId,
+          file,
+          createFilePermissions()  // Use the permission helper function
+        );
+
+        console.log('File successfully uploaded to Appwrite storage');
+      } catch (error: any) {
+        console.error('Error uploading to Appwrite:', error);
+        throw new AppError(`Failed to upload to Appwrite: ${error.message || 'Unknown error'}`, 500);
+      }
 
       // Clean up the temp file
-      fs.unlinkSync(tempFilePath);
+      try {
+        fs.unlinkSync(tempFilePath);
+        console.log(`Temporary file ${tempFilePath} deleted`);
+      } catch (error: any) {
+        console.warn(`Warning: Could not delete temporary file: ${error.message || 'Unknown error'}`);
+        // Continue execution even if cleanup fails
+      }
 
       // Update the video document with any additional information if needed
-      await databases.updateDocument(
-        process.env.APPWRITE_DATABASE_ID || '',
-        VIDEOS_COLLECTION_ID,
-        videoId,
-        { updatedAt: new Date().toISOString() }
-      );
+      try {
+        await databases.updateDocument(
+          DATABASE_ID,
+          VIDEOS_COLLECTION_ID,
+          videoId,
+          {
+            // Update status to indicate the upload is complete
+            status: 'uploaded'
+          },
+          createDocumentPermissions() // Use the permission helper function
+        );
+        console.log('Video document updated in database');
+      } catch (error: any) {
+        console.error('Error updating video document:', error);
+        throw new AppError(`Failed to update video document: ${error.message || 'Unknown error'}`, 500);
+      }
 
       // Return the updated video document
       return this.getVideoById(videoId);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error handling file upload:', error);
       if (error instanceof AppError) {
         throw error;
       }
-      throw new AppError('Failed to upload video file', 500);
+      throw new AppError(`Failed to upload video file: ${error.message || 'Unknown error'}`, 500);
     }
   }
 
@@ -136,9 +196,9 @@ export class VideoService {
       // Get file view (download URL or file content)
       const fileView = await storage.getFileView(VIDEOS_BUCKET_ID, fileId);
       return Buffer.from(fileView);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error streaming video:', error);
-      throw new AppError('Failed to stream video', 500);
+      throw new AppError(`Failed to stream video: ${error.message || 'Unknown error'}`, 500);
     }
   }
 
@@ -155,13 +215,13 @@ export class VideoService {
 
       // Delete the document from database
       await databases.deleteDocument(
-        process.env.APPWRITE_DATABASE_ID || '',
+        DATABASE_ID,
         VIDEOS_COLLECTION_ID,
         id
       );
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error deleting video:', error);
-      throw new AppError('Failed to delete video', 500);
+      throw new AppError(`Failed to delete video: ${error.message || 'Unknown error'}`, 500);
     }
   }
 
@@ -173,7 +233,7 @@ export class VideoService {
     try {
       // Corrected getDocument call with database ID and collection ID
       const video = await databases.getDocument(
-        process.env.APPWRITE_DATABASE_ID || '',
+        DATABASE_ID,
         VIDEOS_COLLECTION_ID,
         id
       );
@@ -185,12 +245,13 @@ export class VideoService {
         mimeType: video.mimeType,
         duration: video.duration,
         fileId: video.fileId,
-        createdAt: new Date(video.createdAt),
-        updatedAt: new Date(video.updatedAt)
+        status: video.status,
+        createdAt: new Date(video.$createdAt), // Use Appwrite's built-in system field
+        updatedAt: new Date(video.$updatedAt)  // Use Appwrite's built-in system field
       };
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching video:', error);
-      throw new AppError('Video not found', 404);
+      throw new AppError(`Video not found: ${error.message || 'Unknown error'}`, 404);
     }
   }
 
@@ -201,7 +262,7 @@ export class VideoService {
     try {
       // Corrected listDocuments call with database ID and collection ID
       const response = await databases.listDocuments(
-        process.env.APPWRITE_DATABASE_ID || '',
+        DATABASE_ID,
         VIDEOS_COLLECTION_ID
       );
 
@@ -212,12 +273,13 @@ export class VideoService {
         mimeType: doc.mimeType,
         duration: doc.duration,
         fileId: doc.fileId,
-        createdAt: new Date(doc.createdAt),
-        updatedAt: new Date(doc.updatedAt)
+        status: doc.status,
+        createdAt: new Date(doc.$createdAt), // Use Appwrite's built-in system field
+        updatedAt: new Date(doc.$updatedAt)  // Use Appwrite's built-in system field
       }));
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error listing videos:', error);
-      throw new AppError('Failed to list videos', 500);
+      throw new AppError(`Failed to list videos: ${error.message || 'Unknown error'}`, 500);
     }
   }
 }

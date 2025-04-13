@@ -6,7 +6,7 @@ This document tracks the development progress, challenges encountered, solutions
 
 | Phase | Description | Status | Completion % |
 |-------|-------------|--------|-------------|
-| 1 | Project Setup and Initial Development | In Progress | 45% |
+| 1 | Project Setup and Initial Development | In Progress | 70% |
 | 2 | Real-time Subtitle Preview and Synchronization | Not Started | 0% |
 | 3 | Subtitle Export and Format Conversion | Not Started | 0% |
 | 4 | UI/UX Enhancement and Optimization | Not Started | 0% |
@@ -20,10 +20,10 @@ This document tracks the development progress, challenges encountered, solutions
 
 | Milestone | Description | Status | Completion % |
 |-----------|-------------|--------|-------------|
-| M1.1 | Set up the development environment | In Progress | 80% |
+| M1.1 | Set up the development environment | Completed | 100% |
 | M1.2 | Implement video upload functionality | In Progress | 60% |
 | M1.3 | Integrate Gemini-flash-2.0 model | Not Started | 0% |
-| M1.4 | Develop initial frontend interface | In Progress | 60% |
+| M1.4 | Develop initial frontend interface | In Progress | 70% |
 
 ### Recently Completed Tasks
 - Created `abs-ui` and `abs-server` repositories with initial Next.js and Express projects
@@ -44,17 +44,32 @@ This document tracks the development progress, challenges encountered, solutions
   - VideoUpload.tsx - For video file uploads with drag and drop support
   - SubtitlePreview.tsx - For displaying video with generated subtitles
   - ExportOptions.tsx - For subtitle format selection and downloading
+- Implemented `useVideoUpload` hook for handling uploads with:
+  - Real-time progress tracking
+  - File validation (type and 4GB size limit)
+  - Error handling and graceful recovery
+  - Upload cancellation support
+  - API integration with backend endpoints
+- Created modular UI components for video upload:
+  - DragDrop.tsx - For handling drag-and-drop file selection with visual feedback
+  - ProgressBar.tsx - For displaying upload progress with visual indicators
+- Configured ESLint and Prettier in both repositories
+- Created development environment setup documentation
+- Set up GitHub Actions for CI/CD pipelines for both frontend and backend
+- Implemented routing using Next.js App Router:
+  - Created route structure for main features (video-upload, subtitle-preview, export)
+  - Developed a NavigationContext for managing workflow state across routes
+  - Implemented a reusable StepNavigation component for consistent user flow
+  - Connected components to navigation system for state management
+  - Added proper page transitions and navigation controls
 
 ### In-Progress Tasks
-- Configure ESLint and Prettier in both repositories
-- Implement frontend components for video upload (DragDrop.tsx, ProgressBar.tsx)
-- Implement basic routing using Next.js App Router
+- Add frontend-backend integration tests for upload workflow
 
 ### Upcoming Tasks
-1. Implement `useVideoUpload` hook for handling uploads
-2. Configure GitHub Actions for CI/CD pipelines
-3. Implement video processing and validation
-4. Integrate Plyr video player with basic subtitle support
+1. Research and implement the Gemini-flash-2.0 integration via Vertex API
+2. Integrate Plyr video player with basic subtitle support
+3. Begin implementation of the subtitle preview functionality
 
 ### Challenges and Solutions
 
@@ -99,11 +114,10 @@ This document tracks the development progress, challenges encountered, solutions
   - Created index.ts files for clean exports and imports
 
 ### Next Steps
-1. Implement `useVideoUpload` hook for handling uploads
-2. Create the DragDrop and ProgressBar components for the video upload feature
-3. Connect frontend components to their corresponding backend API endpoints
-4. Research and implement the Gemini-flash-2.0 integration via Vertex API
-5. Begin implementation of the Plyr video player integration
+1. Complete the frontend components for video upload (add any necessary refinements to DragDrop.tsx and ProgressBar.tsx)
+2. Research and implement the Gemini-flash-2.0 integration via Vertex API
+3. Begin implementation of the Plyr video player integration for subtitle preview
+4. Develop the subtitle generation service with the Vertex API for Gemini-flash-2.0
 
 ### Blockers
 - Vertex API access needs to be set up for Gemini-flash-2.0 integration

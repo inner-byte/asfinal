@@ -4,16 +4,16 @@ import { useState, useCallback } from 'react';
 
 /**
  * Video Upload Hook
- * 
+ *
  * This hook handles the video upload functionality, providing:
  * - File selection and validation
  * - Upload progress tracking
  * - Error handling
  * - Upload cancellation
- * 
+ *
  * It connects to the backend API for uploading videos to Appwrite storage
  * and supports files up to 4GB as specified in project_goals.md.
- * 
+ *
  * References:
  * - Video Upload and Storage requirements from project_goals.md
  * - Appwrite storage integration for secure and scalable video storage
@@ -50,6 +50,7 @@ export interface UseVideoUploadResult {
 // Maximum file size: 4GB (as specified in project requirements)
 const MAX_FILE_SIZE = 4 * 1024 * 1024 * 1024; // 4GB in bytes
 const ALLOWED_FILE_TYPES = ['video/mp4', 'video/webm', 'video/quicktime'];
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001/api';
 
 /**
  * Hook for handling video uploads
@@ -72,16 +73,16 @@ export function useVideoUpload(): UseVideoUploadResult {
     }
 
     if (!ALLOWED_FILE_TYPES.includes(file.type)) {
-      return { 
-        valid: false, 
-        error: 'Invalid file type. Only MP4, WebM, and MOV formats are supported.' 
+      return {
+        valid: false,
+        error: 'Invalid file type. Only MP4, WebM, and MOV formats are supported.'
       };
     }
 
     if (file.size > MAX_FILE_SIZE) {
-      return { 
-        valid: false, 
-        error: 'File is too large. Maximum size is 4GB.' 
+      return {
+        valid: false,
+        error: 'File is too large. Maximum size is 4GB.'
       };
     }
 
@@ -93,7 +94,7 @@ export function useVideoUpload(): UseVideoUploadResult {
    */
   const selectFile = useCallback((file: File | null) => {
     setError(null);
-    
+
     if (!file) {
       setSelectedFile(null);
       return;
@@ -101,7 +102,7 @@ export function useVideoUpload(): UseVideoUploadResult {
 
     const validation = validateFile(file);
     if (!validation.valid) {
-      setError(validation.error || 'Invalid file'); // Fix for TypeScript error - providing fallback
+      setError(validation.error || 'Invalid file');
       setSelectedFile(null);
       return;
     }
@@ -115,7 +116,39 @@ export function useVideoUpload(): UseVideoUploadResult {
   }, [validateFile]);
 
   /**
-   * Uploads the selected video to the server
+   * Initializes a video upload by requesting an upload ID from the server
+   * @returns The video ID for the subsequent upload
+   */
+  const initializeUpload = useCallback(async (fileName: string, fileSize: number, fileType: string): Promise<string> => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/videos`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          fileName: fileName,
+          fileSize: fileSize,
+          mimeType: fileType,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to initialize upload');
+      }
+
+      const data = await response.json();
+      // Fix: Extract the video ID from the data.data object (the API returns a nested structure)
+      return data.data.id;
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to initialize upload';
+      throw new Error(errorMessage);
+    }
+  }, []);
+
+  /**
+   * Uploads the selected video to the server with progress tracking
    */
   const uploadVideo = useCallback(async (file: File): Promise<VideoFile | null> => {
     if (!file) {
@@ -125,7 +158,7 @@ export function useVideoUpload(): UseVideoUploadResult {
 
     const validation = validateFile(file);
     if (!validation.valid) {
-      setError(validation.error || 'Invalid file'); // Fix for TypeScript error - providing fallback
+      setError(validation.error || 'Invalid file');
       return null;
     }
 
@@ -139,64 +172,111 @@ export function useVideoUpload(): UseVideoUploadResult {
     setAbortController(controller);
 
     try {
-      // This will be replaced with actual API integration in a future implementation
-      // For now, we're just simulating the upload process
-      
-      // Simulate upload with progress updates
-      // In the actual implementation, we'll use fetch with a FormData object
-      // and monitor upload progress via the Progress API
-      
-      // For a future implementation, we'll use this endpoint:
-      // const uploadEndpoint = '/api/videos/upload';
-      
-      // In the actual implementation:
-      // const formData = new FormData();
-      // formData.append('video', file);
-      // const response = await fetch(uploadEndpoint, {
-      //   method: 'POST',
-      //   body: formData,
-      //   signal: controller.signal,
-      // });
-      
-      // For now, simulate upload with a delay
-      await simulateUploadProgress(file.size, (progressEvent) => {
-        setProgress(progressEvent);
-      }, controller.signal);
+      // Step 1: Initialize the upload and get a video ID
+      const videoId = await initializeUpload(file.name, file.size, file.type);
 
-      // Create a placeholder response
-      const uploadedVideo: VideoFile = {
-        file,
-        id: `video_${Date.now()}`,
-        name: file.name,
-        size: file.size,
-        type: file.type,
-        uploadedAt: new Date(),
-        url: URL.createObjectURL(file) // This would be the actual URL from Appwrite in production
-      };
+      // Step 2: Upload the file with progress tracking
+      const formData = new FormData();
+      formData.append('video', file);
+
+      const xhr = new XMLHttpRequest();
+
+      // Set up progress tracking
+      xhr.upload.addEventListener('progress', (event) => {
+        if (event.lengthComputable) {
+          const percentage = Math.round((event.loaded / event.total) * 100);
+          setProgress({
+            percentage,
+            bytesUploaded: event.loaded,
+            bytesTotal: event.total
+          });
+        }
+      });
+
+      // Create a Promise to handle the XHR request
+      const uploadPromise = new Promise<VideoFile>((resolve, reject) => {
+        xhr.addEventListener('load', () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+              const response = JSON.parse(xhr.responseText);
+              resolve({
+                file,
+                id: response.id || videoId,
+                name: file.name,
+                size: file.size,
+                type: file.type,
+                uploadedAt: new Date(),
+                url: response.url
+              });
+            // eslint-disable-next-line @typescript-eslint/no-empty-function
+            } catch {
+              reject(new Error('Invalid response format'));
+            }
+          } else {
+            reject(new Error(`Upload failed with status ${xhr.status}`));
+          }
+        });
+
+        xhr.addEventListener('error', () => {
+          reject(new Error('Network error during upload'));
+        });
+
+        xhr.addEventListener('abort', () => {
+          reject(new Error('Upload aborted'));
+        });
+      });
+
+      // Set up abort controller link
+      controller.signal.addEventListener('abort', () => {
+        xhr.abort();
+      });
+
+      // Open and send the request
+      xhr.open('POST', `${API_BASE_URL}/videos/${videoId}/upload`);
+      xhr.send(formData);
+
+      // Wait for upload to complete
+      const uploadedVideo = await uploadPromise;
 
       setIsUploading(false);
       setProgress({ percentage: 100, bytesUploaded: file.size, bytesTotal: file.size });
-      
+
       return uploadedVideo;
     } catch (err) {
-      const errorMessage = err instanceof Error 
-        ? err.message 
+      const errorMessage = err instanceof Error
+        ? err.message
         : 'An unknown error occurred during upload';
-      
+
       // Handle abort case differently
       if (errorMessage.includes('abort')) {
         setError('Upload canceled');
       } else {
         setError(`Upload failed: ${errorMessage}`);
+
+        // Try to cleanup on the server if we had a video ID
+        try {
+          // If we've created a video ID but the upload failed, attempt to delete it
+          const possibleVideoId = errorMessage.match(/videoId:(\w+)/)?.[1];
+          if (possibleVideoId) {
+            await fetch(`${API_BASE_URL}/videos/${possibleVideoId}`, {
+              method: 'DELETE',
+            }).catch(() => {
+              // Silently fail cleanup - already in error handler
+            });
+          }
+        // eslint-disable-next-line @typescript-eslint/no-empty-function
+        } catch {
+          // Ignore cleanup errors as we're already handling the main error
+        }
       }
-      
+
       setIsUploading(false);
       setProgress(null);
       return null;
     } finally {
       setAbortController(null);
     }
-  }, [validateFile]);
+  }, [validateFile, initializeUpload]);
 
   /**
    * Cancels an in-progress upload
@@ -232,38 +312,6 @@ export function useVideoUpload(): UseVideoUploadResult {
     resetState,
     validateFile
   };
-}
-
-/**
- * Helper function to simulate upload progress for development purposes
- * This will be replaced with actual API calls in production
- */
-async function simulateUploadProgress(
-  fileSize: number, 
-  onProgress: (progress: UploadProgress) => void,
-  signal: AbortSignal
-): Promise<void> {
-  const totalChunks = 10;
-  const chunkSize = fileSize / totalChunks;
-  let uploadedSize = 0;
-
-  for (let i = 0; i < totalChunks; i++) {
-    // Check if upload was cancelled
-    if (signal.aborted) {
-      throw new Error('Upload aborted');
-    }
-
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    uploadedSize += chunkSize;
-    const percentage = Math.min(Math.round((uploadedSize / fileSize) * 100), 100);
-    
-    onProgress({
-      percentage,
-      bytesUploaded: uploadedSize,
-      bytesTotal: fileSize
-    });
-  }
 }
 
 export default useVideoUpload;

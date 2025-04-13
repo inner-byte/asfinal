@@ -1,8 +1,9 @@
-import express, { Express, Request, Response, NextFunction } from 'express';
+import express, { Express, Request, Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import routes from './routes';
 import { errorHandler, AppError } from './middleware/errorHandler';
+import { initializeAppwrite } from './config/appwriteInit';
 
 // Load environment variables
 dotenv.config();
@@ -10,6 +11,15 @@ dotenv.config();
 // Initialize Express app
 const app: Express = express();
 const port = process.env.PORT || 3001;
+
+// Initialize Appwrite resources (async, will run in background)
+(async () => {
+  try {
+    await initializeAppwrite();
+  } catch (error) {
+    console.error('Failed to initialize Appwrite resources:', error);
+  }
+})();
 
 // Middleware
 app.use(cors());
@@ -19,6 +29,19 @@ app.use(express.urlencoded({ extended: true }));
 // Simple health check route
 app.get('/health', (req: Request, res: Response) => {
   res.status(200).json({ status: 'ok', message: 'Server is running' });
+});
+
+// Root route
+app.get('/', (req: Request, res: Response) => {
+  res.status(200).json({
+    status: 'ok',
+    message: 'Welcome to the ABS Server API',
+    endpoints: {
+      health: '/health',
+      api: '/api',
+      videos: '/api/videos'
+    }
+  });
 });
 
 // API Routes

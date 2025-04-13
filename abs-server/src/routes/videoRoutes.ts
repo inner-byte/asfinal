@@ -2,16 +2,25 @@ import { Router } from 'express';
 import { VideoController } from '../controllers/videoController';
 import multer from 'multer';
 import path from 'path';
+import fs from 'fs';
 import { AppError } from '../middleware/errorHandler';
 
 // Configure multer for handling file uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, path.join(__dirname, '../uploads'));
+    const uploadsDir = path.join(__dirname, '../uploads');
+    // Ensure the uploads directory exists
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+      console.log(`Created uploads directory at ${uploadsDir}`);
+    }
+    console.log(`Using uploads directory: ${uploadsDir}`);
+    cb(null, uploadsDir);
   },
   filename: (req, file, cb) => {
     // Use original name + timestamp to ensure unique filenames
     const uniqueName = `${Date.now()}-${file.originalname}`;
+    console.log(`Generated filename: ${uniqueName}`);
     cb(null, uniqueName);
   }
 });

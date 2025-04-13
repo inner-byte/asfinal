@@ -8,6 +8,7 @@ export interface Video {
   mimeType: string;
   duration?: number;
   fileId: string;
+  status?: string;
   createdAt: Date;
   updatedAt: Date;
 }
