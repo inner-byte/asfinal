@@ -38,7 +38,7 @@ The AI-powered subtitle generator web application is designed to provide accurat
 ## Non-Functional Requirements
 
 - **Performance**:  
-  - Efficiently manage large video files and processing tasks using Redis for queue management and optimization.  
+  - Efficiently manage large video files and processing tasks using Redis for background job queue optimization.  
   - Ensure responsive application behavior, even during resource-intensive operations.
 
 - **Usability**:  
@@ -67,7 +67,7 @@ The AI-powered subtitle generator web application is designed to provide accurat
   - **Frontend**: Next.js with TypeScript and TailwindCSS (v4).  
   - **Backend**: Node.js with Express.  
   - **Database and Storage**: Appwrite Database and Bucket Storage.  
-  - **Task Management**: Redis for processing optimization.  
+  - **Task Management**: Redis (likely with BullMQ) for processing optimization.  
   - **Video Player**: Plyr with VTT subtitle support.
 
 - **Future Integration**:  

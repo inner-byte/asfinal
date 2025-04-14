@@ -8,14 +8,13 @@ import {
   createDocumentPermissions,
   createFilePermissions
 } from '../config/appwrite';
-// Import InputFile from the correct path
+// Import cache functions directly
+import { getCacheValue, setCacheValue } from '../config/redis';
 import { InputFile } from 'node-appwrite/file';
-import fs from 'fs';
 import { Video } from '../types';
 import { AppError } from '../middleware/errorHandler';
-import { Readable } from 'stream';
-import path from 'path';
-import redisService from './redisService';
+import redisService from './redisService'; // Keep for other methods like deleteCachedVideo etc.
+import { AppwriteException } from 'node-appwrite'; // Import AppwriteException
 
 /**
  * Service for handling video operations
@@ -78,116 +77,97 @@ export class VideoService {
   }
 
   /**
-   * Handle file upload stream to Appwrite storage
+   * Handle file upload buffer directly to Appwrite storage
    * @param videoId The video document ID
-   * @param fileStream Readable stream of the file
-   * @param fileName Original file name
+   * @param fileBuffer Buffer containing the file content
+   * @param fileName Original file name (for Appwrite metadata)
+   * @param fileSize File size (used for validation, not InputFile)
+   * @param mimeType File MIME type (used for validation, not InputFile)
    */
   async handleFileUpload(
     videoId: string,
-    fileStream: Readable,
-    fileName: string
+    fileBuffer: Buffer, // Accept Buffer instead of Readable stream
+    fileName: string,
+    fileSize: number, // Keep for potential validation/logging
+    mimeType: string  // Keep for potential validation/logging
   ): Promise<Video> {
+    let video: Video | null = null; // To store fetched video data
     try {
-      // First get the video document to access the fileId
-      const video = await this.getVideoById(videoId);
-
-      // Create a temp file path for buffering the stream
-      // Use the uploads directory instead of os.tmpdir()
-      const uploadsDir = path.join(__dirname, '../../src/uploads');
-
-      // Ensure the uploads directory exists
-      if (!fs.existsSync(uploadsDir)) {
-        fs.mkdirSync(uploadsDir, { recursive: true });
+      // Get the video document to access the fileId and verify status
+      video = await this.getVideoById(videoId, true); // Skip cache
+      if (video.status !== 'initialized') {
+          throw new AppError(`Video ${videoId} is not in initialized state (current: ${video.status}). Cannot upload.`, 409);
       }
 
-      const tempFilePath = path.join(uploadsDir, `upload_${video.fileId}`);
-      console.log(`Writing file to: ${tempFilePath}`);
+      console.log(`Uploading file buffer directly to Appwrite for fileId: ${video.fileId}`);
 
-      const writeStream = fs.createWriteStream(tempFilePath);
+      // Create InputFile directly from the buffer - Corrected: Removed fileSize and mimeType
+      const inputFile = InputFile.fromBuffer(fileBuffer, fileName);
 
-      // Stream the file to disk first (buffer)
-      await new Promise<void>((resolve, reject) => {
-        fileStream.pipe(writeStream)
-          .on('finish', () => {
-            console.log(`File successfully written to ${tempFilePath}`);
-            resolve();
-          })
-          .on('error', (err) => {
-            console.error(`Error writing file to ${tempFilePath}:`, err);
-            reject(new AppError(`Error writing file: ${err.message}`, 500));
-          });
-      });
+      // Upload the buffer to Appwrite storage
+      const uploadedFile = await storage.createFile(
+        VIDEOS_BUCKET_ID,
+        video.fileId, // Use the fileId stored in the video document
+        inputFile,
+        createFilePermissions()
+      );
+      console.log('File buffer uploaded to Appwrite storage:', uploadedFile.$id);
 
-      // Verify the file exists and has content
-      if (!fs.existsSync(tempFilePath)) {
-        throw new AppError(`Temporary file was not created at ${tempFilePath}`, 500);
-      }
+      // Update the video document status to 'uploaded'
+      const updatedVideoDoc = await databases.updateDocument(
+        DATABASE_ID,
+        VIDEOS_COLLECTION_ID,
+        videoId,
+        { status: 'uploaded' },
+        createDocumentPermissions()
+      );
+      console.log('Video document updated in database');
 
-      const fileStats = fs.statSync(tempFilePath);
-      console.log(`File size: ${fileStats.size} bytes`);
+      // Invalidate relevant caches
+      await redisService.deleteCachedVideo(videoId); // Invalidate specific video
+      await redisService.deleteAllCachedVideos(); // Invalidate list cache
 
-      if (fileStats.size === 0) {
-        throw new AppError('Uploaded file is empty', 400);
-      }
+      // Return the updated video data
+      return {
+        id: updatedVideoDoc.$id,
+        name: updatedVideoDoc.name,
+        fileSize: updatedVideoDoc.fileSize,
+        mimeType: updatedVideoDoc.mimeType,
+        duration: updatedVideoDoc.duration, // Duration might be added later
+        fileId: updatedVideoDoc.fileId,
+        status: updatedVideoDoc.status,
+        createdAt: new Date(updatedVideoDoc.$createdAt),
+        updatedAt: new Date(updatedVideoDoc.$updatedAt)
+      };
 
-      // Upload the file from disk to Appwrite storage
-      try {
-        // Use InputFile.fromPath to create a File object from the file path
-        const file = InputFile.fromPath(tempFilePath, fileName);
-        console.log(`Uploading file to Appwrite bucket: ${VIDEOS_BUCKET_ID}, fileId: ${video.fileId}`);
-
-        await storage.createFile(
-          VIDEOS_BUCKET_ID,
-          video.fileId,
-          file,
-          createFilePermissions()  // Use the permission helper function
-        );
-
-        console.log('File successfully uploaded to Appwrite storage');
-      } catch (error: any) {
-        console.error('Error uploading to Appwrite:', error);
-        throw new AppError(`Failed to upload to Appwrite: ${error.message || 'Unknown error'}`, 500);
-      }
-
-      // Clean up the temp file
-      try {
-        fs.unlinkSync(tempFilePath);
-        console.log(`Temporary file ${tempFilePath} deleted`);
-      } catch (error: any) {
-        console.warn(`Warning: Could not delete temporary file: ${error.message || 'Unknown error'}`);
-        // Continue execution even if cleanup fails
-      }
-
-      // Update the video document with any additional information if needed
-      try {
-        await databases.updateDocument(
-          DATABASE_ID,
-          VIDEOS_COLLECTION_ID,
-          videoId,
-          {
-            // Update status to indicate the upload is complete
-            status: 'uploaded'
-          },
-          createDocumentPermissions() // Use the permission helper function
-        );
-        console.log('Video document updated in database');
-      } catch (error: any) {
-        console.error('Error updating video document:', error);
-        throw new AppError(`Failed to update video document: ${error.message || 'Unknown error'}`, 500);
-      }
-
-      // Invalidate the video list cache since we've added a new video
-      await redisService.deleteAllCachedVideos();
-
-      // Return the updated video document (skip cache to get fresh data)
-      return this.getVideoById(videoId, true);
     } catch (error: any) {
-      console.error('Error handling file upload:', error);
-      if (error instanceof AppError) {
-        throw error;
-      }
-      throw new AppError(`Failed to upload video file: ${error.message || 'Unknown error'}`, 500);
+        console.error('Error during direct file upload from buffer:', error); // Updated log message
+
+        // Attempt to update status to 'upload_failed' if video doc exists
+        if (video) {
+            try {
+                await databases.updateDocument(
+                    DATABASE_ID,
+                    VIDEOS_COLLECTION_ID,
+                    videoId,
+                    { status: 'upload_failed' },
+                    createDocumentPermissions()
+                );
+                console.log(`Video document ${videoId} status updated to 'upload_failed'.`);
+            } catch (updateError: any) {
+                console.error(`Failed to update video document ${videoId} status after upload error: ${updateError.message}`);
+                // Log inconsistency: Storage upload might have partially succeeded or failed, DB status not updated.
+            }
+        }
+
+        // Re-throw specific Appwrite errors or a generic one
+        if (error instanceof AppwriteException) {
+             throw new AppError(`Appwrite error during upload: ${error.message}`, error.code || 500);
+        } else if (error instanceof AppError) {
+            throw error; // Re-throw existing AppErrors (like status conflict)
+        } else {
+            throw new AppError(`Failed to handle file upload from buffer: ${error.message || 'Unknown error'}`, 500); // Updated log message
+        }
     }
   }
 
@@ -255,7 +235,7 @@ export class VideoService {
    */
   async deleteVideo(id: string): Promise<void> {
     try {
-      const video = await this.getVideoById(id);
+      const video = await this.getVideoById(id, true); // Skip cache for deletion
 
       // Delete the file from storage
       await storage.deleteFile(VIDEOS_BUCKET_ID, video.fileId);
@@ -268,9 +248,10 @@ export class VideoService {
       );
 
       // Invalidate caches
-      await redisService.deleteCachedVideo(id);
-      await redisService.deleteCachedSubtitle(id); // Also delete any associated subtitle cache
-      await redisService.deleteAllCachedVideos(); // Invalidate the video list cache
+      await redisService.deleteCachedVideo(id); // Restore Redis call
+      await redisService.deleteCachedSubtitle(id); // Restore Redis call
+      await redisService.deleteAllCachedVideos(); // Restore Redis call for list invalidation
+
     } catch (error: any) {
       console.error('Error deleting video:', error);
       throw new AppError(`Failed to delete video: ${error.message || 'Unknown error'}`, 500);
@@ -286,7 +267,7 @@ export class VideoService {
     try {
       // Check cache first if not skipping cache
       if (!skipCache) {
-        const cachedVideo = await redisService.getCachedVideo(id);
+        const cachedVideo = await redisService.getCachedVideo(id); // Restore Redis call
         if (cachedVideo) {
           console.log(`Cache hit for video ID: ${id}`);
           return cachedVideo;
@@ -314,7 +295,7 @@ export class VideoService {
       };
 
       // Cache the video data for future requests
-      await redisService.cacheVideo(videoData);
+      await redisService.cacheVideo(videoData); // Restore Redis call
 
       return videoData;
     } catch (error: any) {
@@ -328,16 +309,17 @@ export class VideoService {
    * @param skipCache Whether to skip the cache and fetch directly from the database
    */
   async listVideos(skipCache: boolean = false): Promise<Video[]> {
+    const cacheKey = 'video:list'; // Consistent key for the list
     try {
-      // Use a consistent cache key for the video list
-
       // Check cache first if not skipping cache
       if (!skipCache) {
-        const videoListKey = 'video:list';
-        const cachedData = await redisService.getCachedVideo(videoListKey);
-        if (cachedData && 'videos' in cachedData) {
+        // Explicitly type the expected return structure or null
+        // Use the directly imported getCacheValue function
+        const cachedData: { videos: Video[] } | null = await getCacheValue<{ videos: Video[] }>(cacheKey);
+        // Check if cachedData is not null/undefined AND the videos property is an array
+        if (cachedData && Array.isArray(cachedData.videos)) {
           console.log('Cache hit for video list');
-          return cachedData.videos as Video[];
+          return cachedData.videos;
         }
         console.log('Cache miss for video list');
       }
@@ -361,8 +343,8 @@ export class VideoService {
       }));
 
       // Cache the video list for future requests
-      const videoListKey = 'video:list';
-      await redisService.cacheVideo({ id: videoListKey, videos } as any);
+      // Use the directly imported setCacheValue function
+      await setCacheValue(cacheKey, { videos });
 
       return videos;
     } catch (error: any) {
@@ -371,3 +353,6 @@ export class VideoService {
     }
   }
 }
+
+// Export a singleton instance
+export default new VideoService();

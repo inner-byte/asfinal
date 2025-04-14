@@ -1,29 +1,10 @@
 import { Router } from 'express';
 import { VideoController } from '../controllers/videoController';
 import multer from 'multer';
-import path from 'path';
-import fs from 'fs';
 import { AppError } from '../middleware/errorHandler';
 
-// Configure multer for handling file uploads
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadsDir = path.join(__dirname, '../uploads');
-    // Ensure the uploads directory exists
-    if (!fs.existsSync(uploadsDir)) {
-      fs.mkdirSync(uploadsDir, { recursive: true });
-      console.log(`Created uploads directory at ${uploadsDir}`);
-    }
-    console.log(`Using uploads directory: ${uploadsDir}`);
-    cb(null, uploadsDir);
-  },
-  filename: (req, file, cb) => {
-    // Use original name + timestamp to ensure unique filenames
-    const uniqueName = `${Date.now()}-${file.originalname}`;
-    console.log(`Generated filename: ${uniqueName}`);
-    cb(null, uniqueName);
-  }
-});
+// Configure multer for handling file uploads IN MEMORY
+const storage = multer.memoryStorage(); // USE memoryStorage
 
 // File filter to ensure only video files are uploaded
 const fileFilter = (req: Express.Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
@@ -36,7 +17,7 @@ const fileFilter = (req: Express.Request, file: Express.Multer.File, cb: multer.
 
 // Configure the upload middleware with 4GB limit
 const upload = multer({
-  storage,
+  storage, // Use memoryStorage
   fileFilter,
   limits: {
     fileSize: 4 * 1024 * 1024 * 1024 // 4GB limit
@@ -55,7 +36,7 @@ router.post('/', videoController.initializeUpload);
 
 /**
  * @route   POST /api/videos/:id/upload
- * @desc    Upload a video file
+ * @desc    Upload a video file stream
  * @access  Public
  */
 router.post('/:id/upload', upload.single('video'), videoController.uploadVideo);

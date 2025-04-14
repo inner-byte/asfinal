@@ -6,7 +6,7 @@ This document tracks the development progress, challenges encountered, solutions
 
 | Phase | Description | Status | Completion % |
 |-------|-------------|--------|-------------|
-| 1 | Project Setup and Initial Development | In Progress | 80% |
+| 1 | Project Setup and Initial Development | In Progress | 75% |
 | 2 | Real-time Subtitle Preview and Synchronization | Not Started | 0% |
 | 3 | Subtitle Export and Format Conversion | Not Started | 0% |
 | 4 | UI/UX Enhancement and Optimization | Not Started | 0% |
@@ -22,7 +22,7 @@ This document tracks the development progress, challenges encountered, solutions
 |-----------|-------------|--------|-------------|
 | M1.1 | Set up the development environment | Completed | 100% |
 | M1.2 | Implement video upload functionality | Completed | 100% |
-| M1.3 | Integrate Gemini-flash-2.0 model | Completed | 100% |
+| M1.3 | Integrate Gemini-flash-2.0 model | Pending | 0% |
 | M1.4 | Develop initial frontend interface | In Progress | 70% |
 
 ### Recently Completed Tasks
@@ -37,7 +37,7 @@ This document tracks the development progress, challenges encountered, solutions
 - Created database collections for videos and subtitles with proper attributes
 - Configured storage buckets for video and subtitle files with appropriate security settings
 - Implemented backend API endpoints for video upload, streaming, and deletion
-- Added file upload handling functionality with multer middleware
+- Added file upload handling functionality with multer middleware (Note: Review if still needed with streaming approach)
 - Set up frontend project structure according to `project_structure_rules.md`
 - Created basic layout with placeholder components following the "lipsync-2" design
 - Extracted placeholder components into proper modular component files:
@@ -62,21 +62,20 @@ This document tracks the development progress, challenges encountered, solutions
   - Implemented a reusable StepNavigation component for consistent user flow
   - Connected components to navigation system for state management
   - Added proper page transitions and navigation controls
-- Researched and implemented Gemini-flash-2.0 integration via Vertex API:
-  - Installed required Google Cloud and Vertex AI packages
-  - Created a configuration file for Vertex AI client
-  - Enhanced subtitle generation service with Gemini integration
-  - Implemented video transcription with timestamp generation
-  - Added retry mechanisms and error handling for API calls
-  - Updated environment variables for Google Cloud configuration
-  - Added type safety and validation for subtitle generation
+- *Initial research on Gemini-flash-2.0 integration via Vertex API completed.*
 
 ### In-Progress Tasks
-- Integrate Plyr video player with basic subtitle support
+- Integrate Plyr video player with basic subtitle support (`components/SubtitlePreview/PlyrPlayer.tsx`)
+- Develop initial frontend interface components (`SubtitlePreview.tsx`, `ExportOptions.tsx`)
 
 ### Upcoming Tasks
-1. Begin implementation of the subtitle preview functionality
-2. Develop the video player component with subtitle display
+1.  **Implement Refined Gemini Integration Pipeline (M1.3):**
+    *   **Note:** The detailed plan for these tasks is documented in `#file:gemini_transcription_implementation.md`.
+    *   Implement `ffmpegUtils.ts` and `gcsUtils.ts`.
+    *   Update `subtitleService.ts` and `subtitleController.ts`.
+    *   Add necessary configurations and error handling.
+2.  Complete Plyr integration and connect VTT fetching on the frontend preview page.
+3.  Begin Phase 2: Implement `useSubtitleSync` hook and research FFmpeg timestamp correction methods.
 
 ### Challenges and Solutions
 
@@ -85,10 +84,10 @@ This document tracks the development progress, challenges encountered, solutions
 | April 12, 2025 | TypeScript errors with Express error handler middleware | Modified the error handler to use proper Express ErrorRequestHandler type with void return type | Resolved |
 | April 12, 2025 | Appwrite database methods called with incorrect number of arguments | Added database ID parameter to all database calls (createDocument, getDocument, listDocuments) | Resolved |
 | April 12, 2025 | TypeScript error with cors module declaration | Created custom type declaration for cors module | Resolved |
-| April 12, 2025 | Handling large video file uploads (up to 4GB) efficiently | Implemented streaming approach with temporary file storage and cleaned up after upload | Resolved |
+| April 12, 2025 | Handling large video file uploads (up to 4GB) efficiently | Implemented streaming approach for initial upload to Appwrite. *Further streaming needed for processing pipeline.* | Resolved (Initial Upload) |
 | April 12, 2025 | Creating UI components that match the "lipsync-2" design reference | Implemented a modern UI with dark theme, gradient accents, and subtle animations following the design system | Resolved |
 | April 12, 2025 | TypeScript error in components index.ts | Fixed UI/index.ts to properly export a type and constant to make it a valid module | Resolved |
-| April 13, 2025 | Implementing Gemini-flash-2.0 integration with proper type safety | Created a properly typed wrapper for Vertex AI client and added validation for configuration parameters | Resolved |
+| April 13, 2025 | Gemini API limitations for large audio files | **Planned Solution:** Adopt intermediate GCS storage approach: Upload extracted audio to a backend-managed GCS bucket and pass the `gs://` URI to Gemini. Add cleanup steps. | Pending Implementation |
 
 ### Implementation Notes
 
@@ -96,57 +95,52 @@ This document tracks the development progress, challenges encountered, solutions
 - **Package Versions**:
   - Next.js: Version 15 (compatible with React 19)
   - Node.js: Latest stable version
-  - Express: Version 5.1.0 (recently released as default on npm)
+  - Express: Version 5.1.0
   - TypeScript: Version 5.8.3
-  - TailwindCSS: Version 4.0 (as specified in requirements)
+  - TailwindCSS: Version 4.0
   - Plyr: Latest version with confirmed WebVTT subtitle support
-  - FFmpeg: Pending research
-  - Bull (Redis queue): Pending research
-  - Multer: Latest version for handling file uploads
-  - **Google Cloud Vertex AI**: Latest stable SDK (@google-cloud/vertexai)
+  - **`fluent-ffmpeg`**: Latest stable version (Node.js wrapper for FFmpeg binary) - *Selected for audio extraction*
+  - **Background Job Queue**: BullMQ (Redis-backed) - *Selected for Phase 5*
+  - Multer: Latest version (May be less relevant if uploads go directly to Appwrite first)
+  - **Google Cloud Vertex AI**: Latest stable SDK (`@google-cloud/vertexai`)
+  - **Google Cloud Storage**: Latest stable SDK (`@google-cloud/storage`) - *Required for intermediate audio*
+  - **`async-retry`**: Latest stable version - *Selected for Gemini API calls*
   - **Gemini-flash-2.0 Model**: Available through Vertex AI as 'gemini-2.0-flash'
 
 - **API Documentation**:
-  - Gemini-flash-2.0 via Vertex API: Integrated with proper configuration
+  - Gemini-flash-2.0 via Vertex API: Reviewed for integration planning.
   - Appwrite: Version 1.6.1 (as of February 2025)
 
 #### Technical Decisions
-- Structured the backend as MVC-inspired pattern with controllers, services, and routes
-- Used Appwrite for both database and storage operations
-- Implemented proper error handling middleware for Express
-- Created typed interfaces for videos and subtitles to ensure type safety
-- Chose multer for handling file uploads with 4GB file size limit
-- Implemented temporary file storage with cleanup to handle large uploads efficiently
-- Created modern UI following the "lipsync-2" design with custom animations and gradient elements
-- Used Inter and Poppins fonts as specified in the project goals
-- Organized components using feature-based architecture for better maintainability
-- **Added Vertex AI integration with proper type safety and validation**
-- **Implemented retry mechanism with exponential backoff for reliable API calls**
-- **Added validation for VTT format to ensure properly formatted subtitles**
+- Structured the backend as MVC-inspired pattern with controllers, services, and routes.
+- Used Appwrite for primary database and storage operations (videos, final VTTs).
+- Implemented proper error handling middleware for Express (`AppError` class).
+- Created typed interfaces for videos and subtitles to ensure type safety.
+- Implemented streaming for initial video upload to Appwrite.
+- Created modern UI following the "lipsync-2" design with custom animations and gradient elements.
+- Used Inter and Poppins fonts as specified in the project goals.
+- Organized components using feature-based architecture for better maintainability.
+- **Planned Pipeline:** Appwrite Stream -> `fluent-ffmpeg` -> Temp Local Audio -> Backend GCS -> Gemini API -> Appwrite VTT Storage -> Appwrite DB.
+- **Planned:** Use `async-retry` for reliable Gemini API calls.
+- **Planned:** Implement robust VTT formatting.
+- **Planned (Phase 5):** Implement Redis/BullMQ for background job queue management for long-running tasks like subtitle generation.
 
 ### Next Steps
-1. Complete the frontend-backend integration tests for upload workflow
-2. Integrate Plyr video player with basic subtitle support
-3. Begin implementation of the subtitle preview functionality
-4. Develop the video player component with subtitle display
+1.  **Implement Refined Gemini Integration Pipeline (M1.3):** Focus on implementing the steps outlined in `#file:gemini_transcription_implementation.md` and reflected in the updated `#file:tasks.md`.
+2.  Complete the frontend integration for the subtitle preview page (Plyr player, fetching data).
+3.  Begin Phase 2 tasks once M1.3 and M1.4 are complete.
 
 ### Blockers
-- None at this time - Vertex API integration is complete
+- None at this time - Ready to implement the Gemini transcription pipeline.
 
 ## Development Log
 
 ### [DATE: April 13, 2025]
 
 #### Summary
-Implemented Gemini-flash-2.0 integration via Vertex AI for subtitle generation. Created a configuration file for the Vertex AI client, enhanced the subtitle service with proper type safety, and implemented video transcription with timestamp generation. Added retry mechanisms and error handling for API calls.
+Completed initial setup, video upload functionality, and frontend structure. Defined the detailed implementation plan for Gemini integration (`#file:gemini_transcription_implementation.md`). Adjusted task and progress tracking to reflect that this detailed Gemini pipeline is the next major implementation step for Milestone M1.3.
 
 #### Details
-- Researched the latest stable versions and documentation for Google Cloud Vertex AI and Gemini-flash-2.0
-- Installed required packages (@google-cloud/vertexai) for Vertex AI integration
-- Created a configuration file (vertex.ts) for Vertex AI client with proper validation
-- Enhanced subtitle generation service (subtitleService.ts) with Gemini integration
-- Implemented video transcription functionality with timestamp generation in VTT format
-- Added retry mechanisms with exponential backoff for reliable API calls
-- Implemented validation for VTT format to ensure properly formatted subtitles
-- Updated environment variables for Google Cloud configuration
-- Added type safety and validation for subtitle generation
+- Confirmed completion of M1.1 and M1.2.
+- Updated documentation (`tasks.md`, `progress.md`) to accurately reflect the pending status of the detailed Gemini integration pipeline (audio extraction, GCS, API calls, VTT formatting) as the primary focus for completing M1.3.
+- Continued work on initial frontend interface components (M1.4).

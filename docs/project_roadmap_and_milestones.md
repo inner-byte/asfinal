@@ -70,20 +70,21 @@ This roadmap provides a structured plan for developing the AI-powered subtitle g
 - Performance-optimized frontend.
 - Usability test results and feedback summary.
 
- hardcoded **Timeline**: Weeks 11-12
+**Timeline**: Weeks 11-12
 
 ## Phase 5: Backend Optimization and Redis Integration
 
 **Objective**: Enhance backend performance to handle large video processing tasks efficiently using Redis for task management.
 
 **Milestones**:
-- **M5.1**: Integrate Redis for queue management and optimization of video processing tasks.
-- **M5.2**: Implement worker threads or a queue system to manage concurrent processing of large videos (up to 4GB).
-- **M5.3**: Test and validate backend performance under load conditions.
+- **M5.1**: Integrate Redis client and configure BullMQ (or similar Redis-based queue).
+- **M5.2**: Implement background job queue for managing video processing tasks using BullMQ.
+- **M5.3**: Implement worker processes to manage concurrent processing of large videos (up to 4GB) via the Redis queue.
+- **M5.4**: Test and validate backend performance under load conditions with Redis queue.
 
 **Deliverables**:
-- Redis-integrated task management system.
-- Optimized backend processing pipeline.
+- Integrated Redis-based task management system (e.g., BullMQ).
+- Optimized backend processing pipeline using background jobs.
 - Performance test reports.
 
 **Timeline**: Weeks 13-14

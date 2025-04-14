@@ -97,6 +97,35 @@ const VideoUpload: React.FC = () => {
     );
   };
 
+  // Render styled error message
+  const renderErrorMessage = () => {
+    if (!error) return null;
+
+    return (
+      <div className="mt-4 p-4 bg-red-900/30 border border-red-600/50 rounded-lg text-red-300 text-sm flex items-start shadow-md animate-fade-in">
+        {/* Error Icon */}
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="mr-3 flex-shrink-0 text-red-400 mt-0.5" // Adjusted margin and alignment
+        >
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="8" x2="12" y2="12"></line>
+          <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
+        {/* Error Text */}
+        <span>{error}</span>
+      </div>
+    );
+  };
+
   return (
     <div className="w-full flex flex-col items-center">
       <h1 className="text-2xl font-bold mb-6 text-[var(--foreground-primary)]">
@@ -146,12 +175,8 @@ const VideoUpload: React.FC = () => {
             {/* Success message */}
             {renderSuccessMessage()}
 
-            {/* Error message */}
-            {error && (
-              <div className="mt-4 p-3 bg-[color-mix(in_srgb,var(--color-error-light)_15%,transparent)] border border-[var(--color-error)] rounded-md text-[var(--color-error)] text-sm">
-                {error}
-              </div>
-            )}
+            {/* Error message - Use the new renderer */}
+            {renderErrorMessage()}
 
             <div className="flex gap-3 mt-6">
               {isUploading ? (

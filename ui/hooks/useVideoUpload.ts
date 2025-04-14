@@ -53,6 +53,57 @@ const ALLOWED_FILE_TYPES = ['video/mp4', 'video/webm', 'video/quicktime'];
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001/api';
 
 /**
+ * Maps technical error messages to user-friendly ones.
+ * @param error The original error object or message string.
+ * @returns A user-friendly error string.
+ */
+const mapErrorToUserMessage = (error: unknown): string => {
+  let message = 'An unexpected error occurred during upload. Please try again.'; // Default message
+
+  if (error instanceof Error) {
+    // Network errors
+    if (error.message.includes('Network error') || error.message.includes('Failed to fetch')) {
+      message = 'Network connection issue. Please check your internet connection and try again.';
+    }
+    // Abort errors
+    else if (error.message.includes('abort') || error.message.includes('cancel')) {
+      message = 'Upload canceled.';
+    }
+    // Server-side validation errors (look for common patterns)
+    else if (error.message.includes('exceeds the maximum limit')) {
+      message = 'File is too large. Maximum size is 4GB.';
+    } else if (error.message.includes('Invalid file type')) {
+      message = 'Invalid file type. Only MP4, WebM, and MOV formats are supported.';
+    } else if (error.message.includes('Failed to initialize upload')) {
+      message = 'Could not start the upload process. Please try again later.';
+    }
+    // Generic server errors
+    else if (error.message.includes('status 500') || error.message.includes('Internal Server Error')) {
+      message = 'A server error occurred during upload. Please try again later.';
+    }
+    // Specific known issues
+    else if (error.message.includes('Upload failed with status')) {
+      // Extract status code if possible
+      const match = error.message.match(/status (\d+)/);
+      if (match && match[1]) {
+        const status = parseInt(match[1], 10);
+        if (status === 400) message = 'There was a problem with the uploaded file data. Please check the file and try again.';
+        else if (status === 404) message = 'The upload destination could not be found. Please contact support.';
+        else if (status === 409) message = 'There was a conflict processing the upload. Please try again.';
+        else if (status >= 500) message = 'A server error occurred during upload. Please try again later.';
+      } else {
+        message = 'The upload failed unexpectedly. Please try again.';
+      }
+    }
+  } else if (typeof error === 'string') {
+    // Handle plain string errors if any occur
+    message = error;
+  }
+
+  return message;
+};
+
+/**
  * Hook for handling video uploads
  * @returns Methods and state for video upload functionality
  */
@@ -139,7 +190,6 @@ export function useVideoUpload(): UseVideoUploadResult {
       }
 
       const data = await response.json();
-      // Fix: Extract the video ID from the data.data object (the API returns a nested structure)
       return data.data.id;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to initialize upload';
@@ -199,21 +249,34 @@ export function useVideoUpload(): UseVideoUploadResult {
           if (xhr.status >= 200 && xhr.status < 300) {
             try {
               const response = JSON.parse(xhr.responseText);
+              const videoData = response.data;
+              if (!videoData || !videoData.id) {
+                reject(new Error('Invalid response format from server.'));
+                return;
+              }
               resolve({
                 file,
-                id: response.id || videoId,
-                name: file.name,
-                size: file.size,
-                type: file.type,
-                uploadedAt: new Date(),
-                url: response.url
+                id: videoData.id,
+                name: videoData.name || file.name,
+                size: videoData.fileSize || file.size,
+                type: videoData.mimeType || file.type,
+                uploadedAt: new Date(videoData.updatedAt || Date.now()),
               });
-            // eslint-disable-next-line @typescript-eslint/no-empty-function
-            } catch {
-              reject(new Error('Invalid response format'));
+            } catch (parseError) {
+              console.error("Error parsing upload response:", parseError, xhr.responseText);
+              reject(new Error('Received an invalid response from the server.'));
             }
           } else {
-            reject(new Error(`Upload failed with status ${xhr.status}`));
+            let serverErrorMessage = `Upload failed with status ${xhr.status}`;
+            try {
+              const errorResponse = JSON.parse(xhr.responseText);
+              if (errorResponse && errorResponse.message) {
+                serverErrorMessage = errorResponse.message;
+              }
+            } catch {
+              // Ignore parsing error, use default status message
+            }
+            reject(new Error(serverErrorMessage));
           }
         });
 
@@ -243,32 +306,9 @@ export function useVideoUpload(): UseVideoUploadResult {
 
       return uploadedVideo;
     } catch (err) {
-      const errorMessage = err instanceof Error
-        ? err.message
-        : 'An unknown error occurred during upload';
-
-      // Handle abort case differently
-      if (errorMessage.includes('abort')) {
-        setError('Upload canceled');
-      } else {
-        setError(`Upload failed: ${errorMessage}`);
-
-        // Try to cleanup on the server if we had a video ID
-        try {
-          // If we've created a video ID but the upload failed, attempt to delete it
-          const possibleVideoId = errorMessage.match(/videoId:(\w+)/)?.[1];
-          if (possibleVideoId) {
-            await fetch(`${API_BASE_URL}/videos/${possibleVideoId}`, {
-              method: 'DELETE',
-            }).catch(() => {
-              // Silently fail cleanup - already in error handler
-            });
-          }
-        // eslint-disable-next-line @typescript-eslint/no-empty-function
-        } catch {
-          // Ignore cleanup errors as we're already handling the main error
-        }
-      }
+      const userMessage = mapErrorToUserMessage(err);
+      setError(userMessage);
+      console.error("Upload Error:", err);
 
       setIsUploading(false);
       setProgress(null);

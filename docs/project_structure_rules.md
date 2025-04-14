@@ -2,7 +2,7 @@
 
 ## Introduction
 
-This document outlines the project structure rules for the AI-powered subtitle generator web application. The structure is designed to be professional, manageable, and scalable, adhering to the single-responsibility principle. Each directory and file has a specific purpose, ensuring clarity and ease of maintenance. The structure is tailored to our tech stack: Next.js with TypeScript and TailwindCSS v4 (frontend), Node.js with Express (backend), Appwrite (database and storage), and Redis (task management). Best practices are incorporated to align with modern development standards and to prevent common issues.
+This document outlines the project structure rules for the AI-powered subtitle generator web application. The structure is designed to be professional, manageable, and scalable, adhering to the single-responsibility principle. Each directory and file has a specific purpose, ensuring clarity and ease of maintenance. The structure is tailored to our tech stack: Next.js with TypeScript and TailwindCSS v4 (frontend), Node.js with Express (backend), Appwrite (database and storage), and Redis (likely with BullMQ) for background task management. Best practices are incorporated to align with modern development standards and to prevent common issues.
 
 ## Repository Overview
 
@@ -85,7 +85,8 @@ server/
 ├── src/                    # Source code
 │   ├── config/             # Configuration files
 │   │   ├── appwrite.ts     # Appwrite client configuration
-│   │   ├── redis.ts        # Redis client configuration
+│   │   ├── redis.ts        # Redis client and cache configuration
+│   │   ├── memoryCache.ts  # In-memory cache configuration (if kept separate)
 │   │   └── vertex.ts       # Vertex AI API configuration
 │   ├── controllers/        # Request handlers
 │   │   ├── video.ts        # Video upload and processing controller
@@ -104,7 +105,8 @@ server/
 │   │   ├── subtitleService.ts # Subtitle generation and sync logic
 │   │   ├── exportService.ts # Subtitle format conversion logic
 │   │   ├── appwriteService.ts # Appwrite database/storage interactions
-│   │   ├── redisService.ts # Redis queue management
+│   │   ├── redisService.ts # Redis cache and potentially queue interactions
+│   │   ├── backgroundJobService.ts # Background job queue management (Phase 5 - likely using BullMQ)
 │   │   └── ffmpegService.ts # FFmpeg wrapper for subtitle alignment
 │   ├── utils/              # Utility functions
 │   │   ├── logger.ts       # Logging utility
@@ -143,10 +145,10 @@ server/
 - **Storage**: Leverage Appwrite Bucket Storage for video and subtitle files, ensuring efficient access and management.
 - **Implementation**: Centralize Appwrite interactions in `src/services/appwriteService.ts` for reusability and maintainability.
 
-## Redis Integration
+## Background Task Management (Redis Integration)
 
-- **Queue Management**: Use Bull (a Redis-based queue) for task management, configured in `src/services/redisService.ts`.
-- **Implementation**: Define jobs for video processing, subtitle generation, and format conversion, ensuring proper prioritization and retry mechanisms.
+- **Queue Management**: Implement a Redis-backed background job queue (e.g., BullMQ) for task management, configured in `src/config/redis.ts` and managed via `src/services/backgroundJobService.ts`.
+- **Implementation**: Define jobs for video processing, subtitle generation, and format conversion, ensuring proper prioritization and retry mechanisms using the chosen Redis queue library.
 
 ## Version Control and CI/CD
 

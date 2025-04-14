@@ -68,7 +68,21 @@ This document establishes the coding standards and style guides for the AI-power
 
 - **Asynchronous Operations**: Use `async/await` for I/O-bound tasks to ensure non-blocking execution.
 - **Streaming**: Stream large files (uploads/downloads) to optimize memory usage.
-- **Caching**: Cache frequent computations or database queries in Redis for faster response times.
+- **Caching**: Cache frequent computations or database queries using Redis (primary) or in-memory cache (secondary) for faster response times.
+
+### Background Task Management (Redis)
+
+#### Queue Management (BullMQ Recommended)
+
+- **Job Queue**: Implement BullMQ (or similar) for task queuing (e.g., video processing, subtitle generation), leveraging Redis.
+- **Job Prioritization**: Assign higher priority to time-sensitive tasks (e.g., subtitle generation over format conversion).
+- **Retry Mechanism**: Configure exponential backoff for failed jobs to balance resilience and resource use.
+
+#### Best Practices
+
+- **Job Monitoring**: Use BullMQ's built-in monitoring tools or integrate with external dashboards to track queue health and job statuses.
+- **Resource Management**: Cap concurrent jobs to avoid overwhelming server resources.
+- **Error Handling**: Log job failures and notify users of persistent issues.
 
 ## Database: Appwrite
 
@@ -84,26 +98,12 @@ This document establishes the coding standards and style guides for the AI-power
 - **Error Handling**: Handle database errors gracefully, logging issues and retrying transient failures.
 - **Data Validation**: Validate data integrity before writes to prevent corruption.
 
-## Task Management: Redis
-
-### Queue Management
-
-- **Bull Queue**: Implement Bull for task queuing (e.g., video processing, subtitle generation).
-- **Job Prioritization**: Assign higher priority to time-sensitive tasks (e.g., subtitle generation over format conversion).
-- **Retry Mechanism**: Configure exponential backoff for failed jobs to balance resilience and resource use.
-
-### Best Practices
-
-- **Job Monitoring**: Use Bull’s monitoring tools to track queue health and job statuses.
-- **Resource Management**: Cap concurrent jobs to avoid overwhelming server resources.
-- **Error Handling**: Log job failures and notify users of persistent issues.
-
 ## Testing
 
 - **Unit Tests**: Test individual units (functions, components) with Jest for reliability.
 - **Integration Tests**: Verify frontend-backend and service interactions with integration tests.
 - **End-to-End Tests**: Use Cypress or Playwright to simulate user flows (e.g., upload to subtitle export).
-- **Mocking**: Mock external dependencies (e.g., Appwrite, Redis) to isolate test cases.
+- **Mocking**: Mock external dependencies (e.g., Appwrite, Redis, external APIs) to isolate test cases.
 
 ## Code Formatting and Linting
 
