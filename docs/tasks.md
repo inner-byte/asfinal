@@ -39,7 +39,7 @@ This document outlines all tasks for the AI-powered subtitle generator web appli
 - ✅ Implement `useVideoUpload` hook for handling uploads
 - ✅ Create backend API endpoints for video upload
 - ✅ Implement video validation and streaming to Appwrite storage
-- ⏳ Add frontend-backend integration tests for upload workflow
+- ✅ Add frontend-backend integration tests for upload workflow
 
 ### Gemini Integration
 - ✅ Configure Vertex API client for Gemini-flash-2.0 model

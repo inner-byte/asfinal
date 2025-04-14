@@ -1,11 +1,11 @@
 'use client';
 
-import { 
-  createContext, 
-  useContext, 
-  useState, 
-  useEffect, 
-  ReactNode 
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  ReactNode
 } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 
@@ -54,7 +54,7 @@ export function NavigationProvider({ children }: NavigationProviderProps) {
 
   const [currentStep, setCurrentStep] = useState(() => getCurrentStepOrder());
   const totalSteps = WORKFLOW_STEPS.length;
-  
+
   // Update the current step when the pathname changes
   useEffect(() => {
     setCurrentStep(getCurrentStepOrder());
@@ -68,7 +68,7 @@ export function NavigationProvider({ children }: NavigationProviderProps) {
         router.push('/');
         return;
       }
-      
+
       const targetStep = WORKFLOW_STEPS.find((s) => s.order === step);
       if (targetStep) {
         router.push(targetStep.route);
@@ -95,7 +95,7 @@ export function NavigationProvider({ children }: NavigationProviderProps) {
 
   // Check if we can go to the next step
   const canGoNext = currentStep < totalSteps;
-  
+
   // Check if we can go to the previous step
   const canGoPrev = currentStep > 0;
 

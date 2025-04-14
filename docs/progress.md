@@ -72,7 +72,6 @@ This document tracks the development progress, challenges encountered, solutions
   - Added type safety and validation for subtitle generation
 
 ### In-Progress Tasks
-- Add frontend-backend integration tests for upload workflow
 - Integrate Plyr video player with basic subtitle support
 
 ### Upcoming Tasks
