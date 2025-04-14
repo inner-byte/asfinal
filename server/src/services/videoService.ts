@@ -242,25 +242,17 @@ export class VideoService {
 
       console.log(`Found video with fileId: ${video.fileId}`);
 
-      // Create a download URL for the file
-      try {
-        const downloadUrl = await storage.getFileDownload(VIDEOS_BUCKET_ID, video.fileId);
+      // Directly construct the URL using the Appwrite endpoint and API
+      // This is more reliable than using the SDK's getFileView/getFileDownload methods
+      const appwriteEndpoint = process.env.APPWRITE_ENDPOINT || 'https://cloud.appwrite.io/v1';
+      const baseUrl = appwriteEndpoint.endsWith('/') ? appwriteEndpoint.slice(0, -1) : appwriteEndpoint;
 
-        // Ensure we have a valid URL
-        if (!downloadUrl) {
-          throw new AppError(`Failed to generate download URL for fileId: ${video.fileId}`, 500);
-        }
+      // Use the /view endpoint which doesn't trigger a download header
+      // This is better for streaming and processing
+      const directUrl = `${baseUrl}/storage/buckets/${VIDEOS_BUCKET_ID}/files/${video.fileId}/view`;
 
-        const urlString = downloadUrl.toString();
-
-        // Log the URL for debugging
-        console.log(`Generated download URL for video ${videoId}: ${urlString}`);
-
-        return urlString;
-      } catch (storageError: any) {
-        console.error(`Storage error getting download URL for fileId ${video.fileId}:`, storageError);
-        throw new AppError(`Storage error: ${storageError.message || 'Unknown storage error'}`, 500);
-      }
+      console.log(`Constructed direct URL: ${directUrl}`);
+      return directUrl;
     } catch (error: any) {
       console.error('Error getting video download URL:', error);
       throw new AppError(`Failed to get video download URL: ${error.message || 'Unknown error'}`, 500);

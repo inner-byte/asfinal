@@ -74,7 +74,7 @@ export class SubtitleService {
       console.log(`[SubtitleService] Audio uploaded to GCS: ${gcsUri}`);
 
       // Step 4: Generate transcription - Delegate
-      const rawTranscription = await generateTranscriptionViaGemini(gcsUri, language);
+      const rawTranscription = await generateTranscriptionViaGemini(gcsUri, language, mimeType);
 
       // Step 5: Format transcription to VTT - Delegate
       const vttContent = VttFormatter.formatRawTranscriptionToVTT(rawTranscription);

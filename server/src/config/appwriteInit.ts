@@ -209,6 +209,30 @@ async function ensureSubtitlesAttributes(): Promise<void> {
       console.log('Created status attribute for Subtitles collection');
     }
 
+    // Create generatedAt attribute if it doesn't exist
+    if (!existingAttributes.includes('generatedAt')) {
+      await databases.createStringAttribute(
+        DATABASE_ID,
+        SUBTITLES_COLLECTION_ID,
+        'generatedAt',
+        50,  // ISO date string length
+        false  // not required
+      );
+      console.log('Created generatedAt attribute for Subtitles collection');
+    }
+
+    // Create processingMetadata attribute if it doesn't exist
+    if (!existingAttributes.includes('processingMetadata')) {
+      await databases.createStringAttribute(
+        DATABASE_ID,
+        SUBTITLES_COLLECTION_ID,
+        'processingMetadata',
+        1000,  // JSON string can be long
+        false  // not required
+      );
+      console.log('Created processingMetadata attribute for Subtitles collection');
+    }
+
   } catch (error) {
     console.error('Error ensuring Subtitles attributes:', error);
   }

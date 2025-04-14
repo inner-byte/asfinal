@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { useVideoUpload } from '@/hooks';
+import { useVideoUpload, useSubtitleGeneration } from '@/hooks';
 import { DragDrop } from './DragDrop';
 import { ProgressBar } from './ProgressBar';
 import { useNavigation } from '@/contexts/NavigationContext';
@@ -19,8 +19,10 @@ import { useNavigation } from '@/contexts/NavigationContext';
  * - Provide visual feedback during interactions
  */
 const VideoUpload: React.FC = () => {
-  const { goToNextStep, setVideoUploaded } = useNavigation();
+  const { goToNextStep, setVideoUploaded, setSubtitlesGenerated } = useNavigation();
   const [uploadSuccess, setUploadSuccess] = useState<boolean>(false);
+  const [generatingSubtitles, setGeneratingSubtitles] = useState<boolean>(false);
+  const [subtitleError, setSubtitleError] = useState<string | null>(null);
 
   // Use our custom hook for handling video uploads
   const {
@@ -35,6 +37,14 @@ const VideoUpload: React.FC = () => {
     validateFile
   } = useVideoUpload();
 
+  // Use our custom hook for subtitle generation
+  const {
+    isGenerating,
+    error: subtitleGenerationError,
+    result: subtitleResult,
+    generateSubtitles
+  } = useSubtitleGeneration();
+
   // Handle file selection from DragDrop component
   const handleFileSelected = useCallback((file: File) => {
     selectFile(file);
@@ -45,6 +55,7 @@ const VideoUpload: React.FC = () => {
     if (!selectedFile) return;
 
     try {
+      // Step 1: Upload the video
       const result = await uploadVideo(selectedFile.file);
 
       if (result) {
@@ -52,16 +63,37 @@ const VideoUpload: React.FC = () => {
         // Update the navigation context to indicate video is uploaded
         setVideoUploaded(true);
 
-        // Navigate to subtitle preview after a short delay
-        setTimeout(() => {
-          goToNextStep();
-        }, 2000);
+        // Step 2: Generate subtitles automatically
+        setGeneratingSubtitles(true);
+        setSubtitleError(null);
+
+        try {
+          console.log(`Generating subtitles for video ID: ${result.id}`);
+          const subtitles = await generateSubtitles(result.id);
+
+          if (subtitles) {
+            console.log('Subtitle generation successful:', subtitles);
+            // Update the navigation context to indicate subtitles are generated
+            setSubtitlesGenerated(true);
+
+            // Navigate to subtitle preview after a short delay
+            setTimeout(() => {
+              goToNextStep();
+            }, 2000);
+          }
+        } catch (subtitleErr) {
+          console.error('Subtitle generation failed:', subtitleErr);
+          setSubtitleError(typeof subtitleErr === 'string' ? subtitleErr :
+            subtitleErr instanceof Error ? subtitleErr.message : 'Failed to generate subtitles');
+        } finally {
+          setGeneratingSubtitles(false);
+        }
       }
     } catch (err) {
       console.error("Upload failed:", err);
       // Error is already handled by the hook
     }
-  }, [selectedFile, uploadVideo, goToNextStep, setVideoUploaded]);
+  }, [selectedFile, uploadVideo, generateSubtitles, goToNextStep, setVideoUploaded, setSubtitlesGenerated]);
 
 
   // Reset state when component unmounts
@@ -92,9 +124,63 @@ const VideoUpload: React.FC = () => {
           <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
           <polyline points="22 4 12 14.01 9 11.01"></polyline>
         </svg>
-        Upload successful! Redirecting to subtitle preview...
+        Upload successful! {generatingSubtitles ? 'Generating subtitles...' : 'Redirecting to subtitle preview...'}
       </div>
     );
+  };
+
+  // Render subtitle generation status
+  const renderSubtitleStatus = () => {
+    if (!uploadSuccess || (!generatingSubtitles && !isGenerating && !subtitleError && !subtitleGenerationError)) return null;
+
+    if (generatingSubtitles || isGenerating) {
+      return (
+        <div className="mt-2 p-3 bg-[color-mix(in_srgb,var(--color-info-light)_15%,transparent)] border border-[var(--color-info)] rounded-md text-[var(--color-info)] text-sm flex items-center">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="mr-2 animate-spin"
+          >
+            <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
+          </svg>
+          Generating subtitles... This may take a few minutes.
+        </div>
+      );
+    }
+
+    if (subtitleError || subtitleGenerationError) {
+      const errorMessage = subtitleError || subtitleGenerationError;
+      return (
+        <div className="mt-2 p-3 bg-[color-mix(in_srgb,var(--color-error-light)_15%,transparent)] border border-[var(--color-error)] rounded-md text-[var(--color-error)] text-sm flex items-center">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="mr-2"
+          >
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="8" x2="12" y2="12"></line>
+            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+          </svg>
+          Subtitle generation failed: {errorMessage}
+        </div>
+      );
+    }
+
+    return null;
   };
 
   // Render styled error message
@@ -175,6 +261,9 @@ const VideoUpload: React.FC = () => {
             {/* Success message */}
             {renderSuccessMessage()}
 
+            {/* Subtitle generation status */}
+            {renderSubtitleStatus()}
+
             {/* Error message - Use the new renderer */}
             {renderErrorMessage()}
 
@@ -192,14 +281,14 @@ const VideoUpload: React.FC = () => {
                   <button
                     onClick={resetState}
                     className="button button-secondary text-sm"
-                    disabled={uploadSuccess}
+                    disabled={uploadSuccess || generatingSubtitles || isGenerating}
                   >
                     Change File
                   </button>
                   <button
                     onClick={handleUpload}
                     className="button button-primary text-sm"
-                    disabled={uploadSuccess || !selectedFile}
+                    disabled={uploadSuccess || !selectedFile || generatingSubtitles || isGenerating}
                   >
                     Start Upload
                   </button>

@@ -44,7 +44,31 @@ export async function prepareVideoForProcessing(videoId: string): Promise<{ vide
     };
     let response;
     try {
-        response = await fetch(videoUrl.toString(), fetchOptions);
+        console.log(`[VideoProcessingUtils] Fetching video from URL: ${videoUrl}`);
+
+        // Try to validate the URL before fetching
+        try {
+            new URL(videoUrl.toString());
+        } catch (urlError: any) {
+            console.error(`[VideoProcessingUtils] Invalid URL format: ${videoUrl}`);
+            throw new AppError(`Invalid video URL format: ${urlError.message || 'Invalid URL'}`, 500);
+        }
+
+        // Add authentication headers if needed
+        const headers = {
+            'X-Appwrite-Project': process.env.APPWRITE_PROJECT_ID || '',
+            'X-Appwrite-Key': process.env.APPWRITE_API_KEY || '',
+        };
+
+        console.log(`[VideoProcessingUtils] Attempting to fetch video from URL: ${videoUrl}`);
+        response = await fetch(videoUrl.toString(), {
+            ...fetchOptions,
+            headers
+            // Note: 'credentials' option is not available in node-fetch
+        });
+
+        console.log(`[VideoProcessingUtils] Fetch response status: ${response.status} ${response.statusText}`);
+
         if (!response.ok) {
             throw new AppError(`Failed to fetch video stream: ${response.statusText} (${response.status})`, response.status);
         }
@@ -52,9 +76,16 @@ export async function prepareVideoForProcessing(videoId: string): Promise<{ vide
             throw new AppError('Video response body is null or undefined', 500);
         }
     } catch (error: any) {
+        console.error(`[VideoProcessingUtils] Fetch error details:`, error);
+
+        if (error instanceof AppError) {
+            throw error;
+        }
+
         if (error.type === 'request-timeout') {
             throw new AppError(`Fetch timeout after ${fetchOptions.timeout}ms while fetching video: ${error.message}`, 408);
         }
+
         // Wrap other fetch errors
         throw new AppError(`Network error while fetching video: ${error.message}`, 500);
     }

@@ -1,6 +1,8 @@
 import retry from 'async-retry';
 import { getGeminiModel } from '../config/vertex'; // Import the getter function
 import { AppError } from '../middleware/errorHandler';
+// Import the necessary types from the Vertex AI SDK
+import { FileDataPart } from '@google-cloud/vertexai/build/src/types/content';
 
 /**
  * Generates a transcription from an audio file stored in GCS using the Gemini API.
@@ -8,21 +10,24 @@ import { AppError } from '../middleware/errorHandler';
  *
  * @param gcsUri The Google Cloud Storage URI of the audio file (e.g., gs://bucket-name/audio.flac).
  * @param language The language code of the audio (e.g., 'en').
+ * @param mimeType The MIME type of the audio file (e.g., 'audio/flac', 'audio/mp3'). Defaults to 'audio/flac'.
  * @returns The raw transcription text from the Gemini API.
  * @throws AppError if the transcription fails after retries or encounters client errors.
  */
-export async function generateTranscriptionViaGemini(gcsUri: string, language: string): Promise<string> {
+export async function generateTranscriptionViaGemini(gcsUri: string, language: string, mimeType: string = 'audio/flac'): Promise<string> {
     console.log(`[GeminiUtils] Calling Gemini API for transcription of ${gcsUri}`);
 
     // Define the prompt for Gemini, requesting specific timestamp format and accuracy
     const prompt = [
-        "Generate a complete and accurate transcription of the provided audio file.",
+        "Generate a COMPLETE and ACCURATE transcription of the ENTIRE audio file from beginning to end.",
+        "It is CRITICAL that you transcribe the FULL audio file, including all content from start to finish.",
         "Include timestamps in the format [MM:SS.mmm] every 3-5 seconds and for all speaker changes.",
         "Timestamps should have accuracy within ±0.1 to ±3 seconds of the actual audio timing.",
-        "Format timestamps consistently throughout and preserve all spoken content.",
+        "Format timestamps consistently throughout and preserve ALL spoken content without omissions.",
         "If there are multiple speakers, indicate them as 'Speaker 1', 'Speaker 2', etc.",
         `The audio is in ${language} language.`,
-        "Include proper punctuation and paragraph breaks for readability."
+        "Include proper punctuation and paragraph breaks for readability.",
+        "Do not truncate or summarize any part of the audio - transcribe everything completely."
     ].join(' ');
 
     // Use retry with exponential backoff for API calls
@@ -34,8 +39,16 @@ export async function generateTranscriptionViaGemini(gcsUri: string, language: s
                     // Get the Gemini model instance and generate content
                     const model = getGeminiModel();
 
-                    // Use type assertion for the audio part since the type definition might be incomplete
-                    const audioPart = { audio: { gcsUri } } as any;
+                    // Format the audio part according to Vertex AI Gemini API requirements
+                    // Using the correct type definition from the Vertex AI SDK
+                    const audioPart: FileDataPart = {
+                        fileData: {
+                            fileUri: gcsUri,
+                            mimeType: mimeType
+                        }
+                    };
+
+                    console.log(`[GeminiUtils] Using fileData format with mimeType: ${mimeType}`);
 
                     const result = await model.generateContent({
                         contents: [
@@ -52,7 +65,23 @@ export async function generateTranscriptionViaGemini(gcsUri: string, language: s
                         throw new Error('Empty response received from Gemini API');
                     }
 
-                    console.log(`[GeminiUtils] Received transcription text (${Math.round(text.length / 1024)}KB)`);
+                    // Check if the transcription seems incomplete (less than expected or missing end markers)
+                    const textLengthKB = Math.round(text.length / 1024);
+                    console.log(`[GeminiUtils] Received transcription text (${textLengthKB}KB)`);
+
+                    // Basic quality check - if text is suspiciously short, retry
+                    if (textLengthKB < 1) {
+                        throw new Error('Transcription seems too short, possibly incomplete');
+                    }
+
+                    // Check if the text has a reasonable number of timestamps
+                    const timestampCount = (text.match(/\[\d+:\d+\.\d+\]/g) || []).length;
+                    console.log(`[GeminiUtils] Transcription contains ${timestampCount} timestamps`);
+
+                    if (timestampCount < 5) {
+                        throw new Error('Transcription has too few timestamps, possibly incomplete');
+                    }
+
                     return text;
 
                 } catch (error: any) {
@@ -71,13 +100,13 @@ export async function generateTranscriptionViaGemini(gcsUri: string, language: s
                 }
             },
             {
-                retries: 5,
-                minTimeout: 2000,
-                maxTimeout: 30000,
+                retries: 7,
+                minTimeout: 3000,
+                maxTimeout: 60000,
                 factor: 2,
                 randomize: true,
                 onRetry: (error: any, attempt) => {
-                    console.warn(`[GeminiUtils] Retrying Gemini API call (${attempt}/5) due to: ${error.message || 'Unknown error'}`);
+                    console.warn(`[GeminiUtils] Retrying Gemini API call (${attempt}/7) due to: ${error.message || 'Unknown error'}`);
                 }
             }
         );
