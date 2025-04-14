@@ -22,6 +22,9 @@ export interface Subtitle {
   format: SubtitleFormat;
   fileId: string;
   language: string;
+  status?: SubtitleGenerationStatus;
+  processingMetadata?: string;
+  generatedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }

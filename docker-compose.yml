@@ -1,0 +1,74 @@
+services:
+  # Backend Node.js service
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./server:/app
+      - /app/node_modules
+    environment:
+      - PORT=3001
+      - NODE_ENV=development
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=
+      # Appwrite Configuration
+      - APPWRITE_ENDPOINT=${APPWRITE_ENDPOINT}
+      - APPWRITE_PROJECT_ID=${APPWRITE_PROJECT_ID}
+      - APPWRITE_API_KEY=${APPWRITE_API_KEY}
+      # Storage Buckets
+      - APPWRITE_VIDEOS_BUCKET_ID=${APPWRITE_VIDEOS_BUCKET_ID}
+      - APPWRITE_SUBTITLES_BUCKET_ID=${APPWRITE_SUBTITLES_BUCKET_ID}
+      # Database Collections
+      - APPWRITE_DATABASE_ID=${APPWRITE_DATABASE_ID}
+      - APPWRITE_VIDEOS_COLLECTION_ID=${APPWRITE_VIDEOS_COLLECTION_ID}
+      - APPWRITE_SUBTITLES_COLLECTION_ID=${APPWRITE_SUBTITLES_COLLECTION_ID}
+      # Google Cloud & Vertex AI Configuration
+      - GOOGLE_CLOUD_PROJECT_ID=${GOOGLE_CLOUD_PROJECT_ID}
+      - GOOGLE_CLOUD_LOCATION=${GOOGLE_CLOUD_LOCATION}
+      - GEMINI_MODEL_NAME=${GEMINI_MODEL_NAME}
+      - BACKEND_GCS_BUCKET_NAME=${BACKEND_GCS_BUCKET_NAME}
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/credentials.json
+      # Memory Cache Configuration
+      - CACHE_DEFAULT_EXPIRATION=3600
+      - CACHE_MAX_ITEMS=1000
+      - CACHE_ENABLE_CLEANUP=true
+      - CACHE_CLEANUP_INTERVAL=300000
+    depends_on:
+      - redis
+    command: npm run dev
+    restart: unless-stopped
+
+  # Frontend Next.js service
+  ui:
+    build:
+      context: ./ui
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./ui:/app
+      - /app/node_modules
+      - /app/.next
+    environment:
+      - NEXT_PUBLIC_API_URL=http://server:3001
+    depends_on:
+      - server
+    command: npm run dev
+    restart: unless-stopped
+
+  # Redis service
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+
+volumes:
+  redis-data:

@@ -23,13 +23,12 @@ export const createDocumentPermissions = () => {
     // Allow any user to read this document
     Permission.read(Role.any()),
 
-    // Allow the server/backend full access
+    // Allow the server/backend full access using the API key
+    // Note: API key access is handled separately and doesn't need explicit permissions
+    // These permissions are for client-side access
     Permission.read(Role.users()),
     Permission.update(Role.users()),
     Permission.delete(Role.users())
-
-    // Removed individual user permissions as they were causing an error
-    // due to the invalid format of {{user.$id}}
   ];
 };
 
@@ -42,13 +41,12 @@ export const createFilePermissions = () => {
     // Allow any user to read the file
     Permission.read(Role.any()),
 
-    // Allow the server/backend full access
+    // Allow the server/backend full access using the API key
+    // Note: API key access is handled separately and doesn't need explicit permissions
+    // These permissions are for client-side access
     Permission.read(Role.users()),
     Permission.update(Role.users()),
     Permission.delete(Role.users())
-
-    // Removed individual user permissions as they were causing an error
-    // due to the invalid format of {{user.$id}}
   ];
 };
 
@@ -61,23 +59,28 @@ export const ensureBucketExists = async (bucketId: string, bucketName: string) =
     await storage.getBucket(bucketId);
     console.log(`Bucket ${bucketId} already exists`);
   } catch (error) {
-    // If the bucket doesn't exist, create it
-    console.log(`Bucket ${bucketId} not found, creating it...`);
-    await storage.createBucket(
-      bucketId,
-      bucketName,
-      [
-        Permission.read(Role.any()),
-        Permission.create(Role.users()),
-        Permission.update(Role.users()),
-        Permission.delete(Role.users())
-      ],
-      true, // File security
-      true, // Enabled
-      2147483648, // Maximum file size (2GB - Appwrite's actual limit)
-      ['video/*', 'application/octet-stream'], // Allowed file extensions
-    );
-    console.log(`Bucket ${bucketId} created successfully`);
+    try {
+      // If the bucket doesn't exist, create it
+      console.log(`Bucket ${bucketId} not found, creating it...`);
+      await storage.createBucket(
+        bucketId,
+        bucketName,
+        [
+          Permission.read(Role.any()),
+          Permission.create(Role.users()),
+          Permission.update(Role.users()),
+          Permission.delete(Role.users())
+        ],
+        true, // File security
+        true, // Enabled
+        4294967296, // Maximum file size (4GB to match project requirements)
+        ['video/*', 'application/octet-stream'], // Allowed file extensions
+      );
+      console.log(`Bucket ${bucketId} created successfully`);
+    } catch (createError: any) {
+      console.error(`Failed to create bucket ${bucketId}: ${createError.message}`);
+      throw createError; // Re-throw to propagate the error
+    }
   }
 };
 
@@ -90,22 +93,27 @@ export const ensureCollectionExists = async (databaseId: string, collectionId: s
     await databases.getCollection(databaseId, collectionId);
     console.log(`Collection ${collectionId} already exists`);
   } catch (error) {
-    // If the collection doesn't exist, create it
-    console.log(`Collection ${collectionId} not found, creating it...`);
-    await databases.createCollection(
-      databaseId,
-      collectionId,
-      collectionName,
-      [
-        Permission.read(Role.any()),
-        Permission.create(Role.users()),
-        Permission.update(Role.users()),
-        Permission.delete(Role.users())
-      ],
-      true, // Enabled
-      true  // Enable document security with custom permissions per document
-    );
-    console.log(`Collection ${collectionId} created successfully`);
+    try {
+      // If the collection doesn't exist, create it
+      console.log(`Collection ${collectionId} not found, creating it...`);
+      await databases.createCollection(
+        databaseId,
+        collectionId,
+        collectionName,
+        [
+          Permission.read(Role.any()),
+          Permission.create(Role.users()),
+          Permission.update(Role.users()),
+          Permission.delete(Role.users())
+        ],
+        true, // Enabled
+        true  // Enable document security with custom permissions per document
+      );
+      console.log(`Collection ${collectionId} created successfully`);
+    } catch (createError: any) {
+      console.error(`Failed to create collection ${collectionId}: ${createError.message}`);
+      throw createError; // Re-throw to propagate the error
+    }
   }
 };
 

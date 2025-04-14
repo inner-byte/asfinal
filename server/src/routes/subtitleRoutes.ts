@@ -1,18 +1,27 @@
 import { Router } from 'express';
-// Import necessary controllers when they are created
-// import { getSubtitles, generateSubtitles } from '../controllers/subtitleController';
+import {
+  generateSubtitles,
+  getSubtitlesByVideoId,
+  getSubtitleById,
+  getSubtitleContent,
+  deleteSubtitle
+} from '../controllers/subtitleController';
 
 const router = Router();
 
-// Define subtitle routes here
-// Example placeholder routes (replace with actual implementation later)
-router.get('/:videoId', (req, res) => {
-  res.status(501).json({ message: 'Get subtitles not implemented yet' });
-});
-router.post('/:videoId/generate', (req, res) => {
-  res.status(501).json({ message: 'Generate subtitles not implemented yet' });
-});
-// router.get('/:videoId', getSubtitles);
-// router.post('/:videoId/generate', generateSubtitles);
+// GET subtitles for a specific video
+router.get('/video/:videoId', getSubtitlesByVideoId);
+
+// Generate subtitles for a video
+router.post('/video/:videoId/generate', generateSubtitles);
+
+// Get specific subtitle by ID
+router.get('/:id', getSubtitleById);
+
+// Get subtitle content by file ID
+router.get('/content/:fileId', getSubtitleContent);
+
+// Delete a subtitle
+router.delete('/:id', deleteSubtitle);
 
 export default router;

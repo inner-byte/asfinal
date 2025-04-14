@@ -12,14 +12,6 @@ import { Video } from '../types';
  * Service for interacting with the Redis cache.
  */
 export class RedisService {
-  [x: string]: any;
-  [x: string]: any;
-  getCacheValue<T>(cacheKey: string) {
-    throw new Error('Method not implemented.');
-  }
-  setCacheValue(cacheKey: string, arg1: { videos: { id: string; name: any; fileSize: any; mimeType: any; duration: any; fileId: any; status: any; createdAt: Date; updatedAt: Date; }[]; }) {
-    throw new Error('Method not implemented.');
-  }
 
   /**
    * Cache video metadata in Redis.

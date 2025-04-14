@@ -88,6 +88,7 @@ export class VideoController {
   streamVideo = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { id } = req.params;
+      const range = req.headers.range;
 
       if (!id) {
         throw new AppError('Video ID is required', 400);
@@ -96,15 +97,51 @@ export class VideoController {
       // Get the video metadata to find the fileId
       const video = await videoService.getVideoById(id);
 
-      // Stream the video file
-      const videoBuffer = await videoService.streamVideo(video.fileId);
+      // Get video file metadata for proper headers
+      const fileMetadata = await videoService.getVideoFileMetadata(video.fileId);
 
-      // Set appropriate headers
-      res.setHeader('Content-Type', video.mimeType);
-      res.setHeader('Content-Length', videoBuffer.length);
+      // Set content type header
+      res.setHeader('Content-Type', fileMetadata.mimeType);
 
-      // Send the video file
-      res.status(200).send(videoBuffer);
+      // Set cache control headers to improve performance
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+
+      // Handle range requests (for seeking in video)
+      if (range) {
+        const parts = range.replace(/bytes=/, '').split('-');
+        const start = parseInt(parts[0], 10);
+        const end = parts[1] ? parseInt(parts[1], 10) : fileMetadata.size - 1;
+        const chunkSize = (end - start) + 1;
+
+        // Set partial content headers
+        res.status(206);
+        res.setHeader('Content-Range', `bytes ${start}-${end}/${fileMetadata.size}`);
+        res.setHeader('Accept-Ranges', 'bytes');
+        res.setHeader('Content-Length', chunkSize);
+
+        console.log(`Streaming video ${id} with range: bytes ${start}-${end}/${fileMetadata.size}`);
+      } else {
+        // Set content length for full file
+        res.setHeader('Accept-Ranges', 'bytes');
+        res.setHeader('Content-Length', fileMetadata.size);
+        console.log(`Streaming full video ${id}, size: ${fileMetadata.size} bytes`);
+      }
+
+      // Get the video stream
+      const videoStream = await videoService.getVideoStream(video.fileId);
+
+      // Pipe the stream directly to the response
+      videoStream.pipe(res);
+
+      // Handle errors in the stream
+      videoStream.on('error', (error) => {
+        console.error(`Error streaming video ${id}:`, error);
+        // Only send error if headers haven't been sent yet
+        if (!res.headersSent) {
+          next(new AppError(`Video streaming error: ${error.message}`, 500));
+        }
+      });
+
     } catch (error) {
       next(error);
     }

@@ -8,8 +8,7 @@ import {
   createDocumentPermissions,
   createFilePermissions
 } from '../config/appwrite';
-// Import cache functions directly
-import { getCacheValue, setCacheValue } from '../config/redis';
+// Import redisService for all cache operations
 import { InputFile } from 'node-appwrite/file';
 import { Video } from '../types';
 import { AppError } from '../middleware/errorHandler';
@@ -88,8 +87,8 @@ export class VideoService {
     videoId: string,
     fileBuffer: Buffer, // Accept Buffer instead of Readable stream
     fileName: string,
-    fileSize: number, // Keep for potential validation/logging
-    mimeType: string  // Keep for potential validation/logging
+    _fileSize: number, // Unused but kept for API compatibility
+    _mimeType: string  // Unused but kept for API compatibility
   ): Promise<Video> {
     let video: Video | null = null; // To store fetched video data
     try {
@@ -172,17 +171,56 @@ export class VideoService {
   }
 
   /**
-   * Stream video file from storage
+   * Get a readable stream for a video file from storage
    * @param fileId The file ID in storage
+   * @returns A Promise that resolves to a Node.js Readable stream
    */
-  async streamVideo(fileId: string): Promise<Buffer> {
+  async getVideoStream(fileId: string): Promise<NodeJS.ReadableStream> {
     try {
-      // Get file view (download URL or file content)
-      const fileView = await storage.getFileView(VIDEOS_BUCKET_ID, fileId);
-      return Buffer.from(fileView);
+      console.log(`Getting video stream for fileId: ${fileId}`);
+
+      // Get the download URL for the file
+      const downloadUrl = await storage.getFileDownload(VIDEOS_BUCKET_ID, fileId);
+
+      // Fetch the file using node-fetch
+      const response = await fetch(downloadUrl.toString());
+
+      // Check if the response is OK
+      if (!response.ok) {
+        throw new Error(`Failed to fetch video: HTTP ${response.status} ${response.statusText}`);
+      }
+
+      // Ensure the response body is available as a stream
+      if (!response.body) {
+        throw new Error('Response body is null or undefined');
+      }
+
+      // Return the readable stream
+      return response.body as unknown as NodeJS.ReadableStream;
     } catch (error: any) {
-      console.error('Error streaming video:', error);
-      throw new AppError(`Failed to stream video: ${error.message || 'Unknown error'}`, 500);
+      console.error('Error getting video stream:', error);
+      throw new AppError(`Failed to get video stream: ${error.message || 'Unknown error'}`, 500);
+    }
+  }
+
+  /**
+   * Get video file metadata (content type, size, etc.)
+   * @param fileId The file ID in storage
+   * @returns Promise with the file metadata
+   */
+  async getVideoFileMetadata(fileId: string): Promise<{ mimeType: string; size: number; name: string }> {
+    try {
+      // Get file metadata from Appwrite
+      const file = await storage.getFile(VIDEOS_BUCKET_ID, fileId);
+
+      return {
+        mimeType: file.mimeType,
+        size: file.sizeOriginal,
+        name: file.name
+      };
+    } catch (error: any) {
+      console.error('Error getting video file metadata:', error);
+      throw new AppError(`Failed to get video file metadata: ${error.message || 'Unknown error'}`, 500);
     }
   }
 
@@ -309,15 +347,13 @@ export class VideoService {
    * @param skipCache Whether to skip the cache and fetch directly from the database
    */
   async listVideos(skipCache: boolean = false): Promise<Video[]> {
-    const cacheKey = 'video:list'; // Consistent key for the list
     try {
       // Check cache first if not skipping cache
       if (!skipCache) {
-        // Explicitly type the expected return structure or null
-        // Use the directly imported getCacheValue function
-        const cachedData: { videos: Video[] } | null = await getCacheValue<{ videos: Video[] }>(cacheKey);
-        // Check if cachedData is not null/undefined AND the videos property is an array
-        if (cachedData && Array.isArray(cachedData.videos)) {
+        // Use redisService for cache operations
+        const cachedData = await redisService.getCachedVideo('list');
+        // Check if cachedData is not null/undefined AND has a videos property that is an array
+        if (cachedData && 'videos' in cachedData && Array.isArray(cachedData.videos)) {
           console.log('Cache hit for video list');
           return cachedData.videos;
         }
@@ -342,9 +378,9 @@ export class VideoService {
         updatedAt: new Date(doc.$updatedAt)  // Use Appwrite's built-in system field
       }));
 
-      // Cache the video list for future requests
-      // Use the directly imported setCacheValue function
-      await setCacheValue(cacheKey, { videos });
+      // Cache the video list for future requests using redisService
+      const videoListData = { id: 'list', videos } as unknown as Video;
+      await redisService.cacheVideo(videoListData);
 
       return videos;
     } catch (error: any) {

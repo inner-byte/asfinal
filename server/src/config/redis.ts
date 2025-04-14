@@ -13,19 +13,64 @@ const redisOptions = {
   port: parseInt(process.env.REDIS_PORT || '6379', 10),
   password: process.env.REDIS_PASSWORD || undefined,
   maxRetriesPerRequest: null, // Let ioredis handle reconnection attempts
+  retryStrategy: (times: number) => {
+    const delay = Math.min(times * 50, 2000);
+    return delay;
+  },
+  reconnectOnError: (err: Error) => {
+    const targetError = 'READONLY';
+    if (err.message.includes(targetError)) {
+      // Only reconnect when the error contains "READONLY"
+      return true;
+    }
+    return false;
+  },
+  enableOfflineQueue: true,
+  connectTimeout: 10000, // 10 seconds
+  lazyConnect: true, // Don't connect immediately
 };
 
 // Create Redis client instance
-const redisClient = new IORedis(redisOptions);
+let redisClient: IORedis;
 
-redisClient.on('connect', () => {
-  console.log('Connected to Redis server');
-});
+try {
+  redisClient = new IORedis(redisOptions);
 
-redisClient.on('error', (err) => {
-  console.error('Redis connection error:', err);
-  // Note: ioredis will automatically try to reconnect
-});
+  redisClient.on('connect', () => {
+    console.log('Connected to Redis server');
+  });
+
+  redisClient.on('ready', () => {
+    console.log('Redis client ready');
+  });
+
+  redisClient.on('error', (err) => {
+    console.error('Redis connection error:', err);
+    // Note: ioredis will automatically try to reconnect
+  });
+
+  redisClient.on('reconnecting', () => {
+    console.log('Redis client reconnecting...');
+  });
+
+  redisClient.on('close', () => {
+    console.log('Redis connection closed');
+  });
+
+  redisClient.on('end', () => {
+    console.log('Redis connection ended');
+  });
+
+  // Connect to Redis
+  redisClient.connect().catch(err => {
+    console.error('Failed to connect to Redis:', err);
+  });
+} catch (error) {
+  console.error('Error creating Redis client:', error);
+  // Create a dummy client that doesn't actually connect to Redis
+  // This allows the application to start even if Redis is not available
+  redisClient = new IORedis(null as any);
+}
 
 /**
  * Set a value in the Redis cache with expiration
@@ -39,6 +84,12 @@ export const setCacheValue = async (
   expirationInSeconds: number = DEFAULT_EXPIRATION_TIME
 ): Promise<void> => {
   try {
+    // Check if Redis is connected
+    if (redisClient.status !== 'ready') {
+      console.warn(`Redis not ready, skipping cache set for key ${key}`);
+      return;
+    }
+
     // Store directly in Redis
     await redisClient.set(key, JSON.stringify(value), 'EX', expirationInSeconds);
   } catch (error) {
@@ -55,6 +106,12 @@ export const setCacheValue = async (
  */
 export const getCacheValue = async <T>(key: string): Promise<T | null> => {
   try {
+    // Check if Redis is connected
+    if (redisClient.status !== 'ready') {
+      console.warn(`Redis not ready, skipping cache get for key ${key}`);
+      return null;
+    }
+
     // Get directly from Redis
     const redisValue = await redisClient.get(key);
     if (redisValue) {
@@ -75,6 +132,12 @@ export const getCacheValue = async <T>(key: string): Promise<T | null> => {
  */
 export const deleteCacheValue = async (key: string): Promise<void> => {
   try {
+    // Check if Redis is connected
+    if (redisClient.status !== 'ready') {
+      console.warn(`Redis not ready, skipping cache delete for key ${key}`);
+      return;
+    }
+
     // Delete directly from Redis
     await redisClient.del(key);
   } catch (error) {
@@ -89,6 +152,12 @@ export const deleteCacheValue = async (key: string): Promise<void> => {
  */
 export const deleteCachePattern = async (pattern: string): Promise<void> => {
   try {
+    // Check if Redis is connected
+    if (redisClient.status !== 'ready') {
+      console.warn(`Redis not ready, skipping cache pattern delete for pattern ${pattern}`);
+      return;
+    }
+
     // Delete matching keys from Redis using SCAN
     let cursor = '0';
     do {
