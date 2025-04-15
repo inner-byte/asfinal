@@ -76,6 +76,10 @@ const mapErrorToUserMessage = (error: unknown): string => {
       message = 'Invalid file type. Only MP4, WebM, and MOV formats are supported.';
     } else if (error.message.includes('Failed to initialize upload')) {
       message = 'Could not start the upload process. Please try again later.';
+    } else if (error.message.includes('Missing required attribute "videoId"')) {
+      message = 'Server error: Could not process the video ID. Please try again or contact support.';
+    } else if (error.message.includes('Invalid document structure')) {
+      message = 'Server error: Invalid response format. Please try again or contact support.';
     }
     // Generic server errors
     else if (error.message.includes('status 500') || error.message.includes('Internal Server Error')) {
@@ -184,12 +188,29 @@ export function useVideoUpload(): UseVideoUploadResult {
         }),
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to initialize upload');
+        const errorMessage = data.message || 'Failed to initialize upload';
+        throw new Error(errorMessage);
       }
 
-      const data = await response.json();
+      // Debug log to see the actual response structure
+      console.log('Server response for video initialization:', data);
+
+      // Validate the response structure
+      if (!data || !data.status || data.status !== 'success' || !data.data) {
+        console.error('Invalid response format:', data);
+        throw new Error('Invalid response format from server');
+      }
+
+      // Validate that the video ID exists in the response
+      if (!data.data.id) {
+        console.error('Missing video ID in response data:', data.data);
+        throw new Error('Invalid document structure: Missing required attribute "videoId"');
+      }
+
+      console.log('Successfully retrieved video ID:', data.data.id);
       return data.data.id;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to initialize upload';
@@ -249,11 +270,23 @@ export function useVideoUpload(): UseVideoUploadResult {
           if (xhr.status >= 200 && xhr.status < 300) {
             try {
               const response = JSON.parse(xhr.responseText);
-              const videoData = response.data;
-              if (!videoData || !videoData.id) {
+
+              // Validate the response structure
+              if (!response || !response.status || response.status !== 'success' || !response.data) {
+                console.error("Invalid response structure:", xhr.responseText);
                 reject(new Error('Invalid response format from server.'));
                 return;
               }
+
+              const videoData = response.data;
+
+              // Validate that the video data contains the required fields
+              if (!videoData || !videoData.id) {
+                console.error("Missing required fields in video data:", videoData);
+                reject(new Error('Invalid document structure: Missing required attribute "videoId"'));
+                return;
+              }
+
               resolve({
                 file,
                 id: videoData.id,
