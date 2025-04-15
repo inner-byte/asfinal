@@ -1,7 +1,10 @@
 import { Request, Response, NextFunction } from 'express';
-import { ApiResponse, Video } from '../types';
+import { ApiResponse, Video, Subtitle } from '../types';
 import { AppError } from '../middleware/errorHandler';
 import videoService from '../services/videoService'; // Import the singleton instance
+import redisService from '../services/redisService'; // Import Redis service for deduplication
+import subtitleService from '../services/subtitleService'; // Import subtitle service
+import { generateFileHash } from '../utils/hashUtils'; // Import file hash utility
 
 /**
  * Controller for handling video-related API requests
@@ -49,7 +52,7 @@ export class VideoController {
   /**
    * Upload video file buffer to Appwrite storage
    */
-  uploadVideo = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  uploadVideo = async (req: Request, res: Response, next: NextFunction): Promise<void | Response> => {
     try {
       const { id } = req.params;
 
@@ -68,6 +71,78 @@ export class VideoController {
         throw new AppError('File buffer is empty or missing in the request.', 500);
       }
 
+      // Generate file hash and check for duplicates
+      const fileHash = generateFileHash(buffer);
+      console.log(`Generated file hash: ${fileHash} for file ${fileName}`);
+      const existingVideo = await redisService.getVideoByFileHash(fileHash);
+
+      if (existingVideo) {
+        console.log(`Duplicate file detected with hash ${fileHash}, videoId: ${existingVideo.videoId}`);
+
+        // Get video and subtitle information
+        let videoData: Video | null = null;
+        let subtitleData: Subtitle | null = null;
+        let videoExists = false;
+        let fileExists = false;
+
+        try {
+          // Check if the video document exists in Appwrite
+          videoData = await videoService.getVideoById(existingVideo.videoId);
+          videoExists = true;
+
+          // Check if the file still exists in Appwrite storage
+          try {
+            // Verify the file exists by attempting to get its metadata
+            await videoService.getVideoFileMetadata(videoData.fileId);
+            fileExists = true;
+          } catch (fileError: any) {
+            console.warn(`File for video ${existingVideo.videoId} no longer exists in storage: ${fileError.message || 'Unknown error'}`);
+            // File doesn't exist, but document does
+          }
+
+          // Only check for subtitle if the video document exists
+          if (existingVideo.subtitleId) {
+            try {
+              subtitleData = await subtitleService.getSubtitleById(existingVideo.subtitleId);
+            } catch (subtitleError: any) {
+              console.warn(`Subtitle ${existingVideo.subtitleId} not found: ${subtitleError.message || 'Unknown error'}`);
+            }
+          }
+        } catch (videoError: any) {
+          console.warn(`Video document ${existingVideo.videoId} not found: ${videoError.message || 'Unknown error'}`);
+          // Video document doesn't exist
+        }
+
+        // If the video document exists but the file doesn't, or if the video document doesn't exist,
+        // remove the hash from Redis and proceed with normal upload
+        if (!videoExists || !fileExists) {
+          console.log(`Removing stale file hash ${fileHash} from Redis as the referenced video/file no longer exists`);
+          // Delete the file hash from Redis
+          await redisService.deleteFileHash(fileHash);
+        } else {
+          // Both video document and file exist, return duplicate information
+          const response: ApiResponse<{
+            isDuplicate: boolean,
+            videoId: string,
+            subtitleId?: string,
+            videoData?: Video,
+            subtitleData?: Subtitle
+          }> = {
+            status: 'success',
+            data: {
+              isDuplicate: true,
+              videoId: existingVideo.videoId,
+              subtitleId: existingVideo.subtitleId,
+              videoData: videoData || undefined,
+              subtitleData: subtitleData || undefined
+            },
+            message: 'Duplicate file detected. Redirecting to existing media.'
+          };
+
+          return res.status(200).json(response);
+        }
+      }
+
       // Validate fileSize against buffer length for consistency
       if (fileSize !== buffer.length) {
          console.warn(`Reported file size (${fileSize}) differs from buffer length (${buffer.length}). Using buffer length.`);
@@ -82,9 +157,13 @@ export class VideoController {
         mimeType
       );
 
-      const response: ApiResponse<Video> = {
+      // Store the file hash for future duplicate checks
+      await redisService.storeFileHash(fileHash, { videoId: video.id });
+      console.log(`Stored file hash ${fileHash} for video ${video.id}`);
+
+      const response: ApiResponse<Video & { fileHash: string }> = {
         status: 'success',
-        data: video,
+        data: { ...video, fileHash },
         message: 'Video uploaded successfully'
       };
 

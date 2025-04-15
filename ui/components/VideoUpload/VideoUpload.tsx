@@ -60,8 +60,73 @@ const VideoUpload: React.FC = () => {
 
       if (result) {
         setUploadSuccess(true);
-        // Update the navigation context to indicate video is uploaded
-        setVideoUploaded(true);
+
+        // Check if this is a duplicate file
+        if (result.isDuplicate && result.duplicateData) {
+          console.log('Handling duplicate file:', result.duplicateData);
+
+          // Store the video info in the navigation context
+          setVideoUploaded({
+            id: result.duplicateData.videoId,
+            name: result.name,
+            isDuplicate: true
+          });
+
+          // If subtitles already exist for this video
+          if (result.duplicateData.subtitleId && result.duplicateData.subtitleData) {
+            console.log('Duplicate has existing subtitles:', result.duplicateData.subtitleData);
+
+            // Store the subtitle info in the navigation context
+            setSubtitlesGenerated({
+              id: result.duplicateData.subtitleId,
+              videoId: result.duplicateData.videoId,
+              isDuplicate: true
+            });
+
+            // Show success message briefly before redirecting
+            setTimeout(() => {
+              goToNextStep();
+            }, 2000);
+            return;
+          }
+
+          // If no subtitles exist yet, generate them
+          setGeneratingSubtitles(true);
+          setSubtitleError(null);
+
+          try {
+            console.log(`Generating subtitles for duplicate video ID: ${result.duplicateData.videoId}`);
+            const subtitles = await generateSubtitles(result.duplicateData.videoId);
+
+            if (subtitles) {
+              console.log('Subtitle generation successful for duplicate:', subtitles);
+              setSubtitlesGenerated({
+                id: subtitles.id,
+                videoId: result.duplicateData.videoId,
+                isDuplicate: true
+              });
+
+              setTimeout(() => {
+                goToNextStep();
+              }, 2000);
+            }
+          } catch (subtitleErr) {
+            console.error('Subtitle generation failed for duplicate:', subtitleErr);
+            setSubtitleError(typeof subtitleErr === 'string' ? subtitleErr :
+              subtitleErr instanceof Error ? subtitleErr.message : 'Failed to generate subtitles');
+          } finally {
+            setGeneratingSubtitles(false);
+          }
+
+          return;
+        }
+
+        // Handle normal (non-duplicate) upload
+        setVideoUploaded({
+          id: result.id!,
+          name: result.name,
+          isDuplicate: false
+        });
 
         // Step 2: Generate subtitles automatically
         setGeneratingSubtitles(true);
@@ -69,12 +134,16 @@ const VideoUpload: React.FC = () => {
 
         try {
           console.log(`Generating subtitles for video ID: ${result.id}`);
-          const subtitles = await generateSubtitles(result.id);
+          const subtitles = await generateSubtitles(result.id!);
 
           if (subtitles) {
             console.log('Subtitle generation successful:', subtitles);
             // Update the navigation context to indicate subtitles are generated
-            setSubtitlesGenerated(true);
+            setSubtitlesGenerated({
+              id: subtitles.id,
+              videoId: result.id!,
+              isDuplicate: false
+            });
 
             // Navigate to subtitle preview after a short delay
             setTimeout(() => {
@@ -107,6 +176,9 @@ const VideoUpload: React.FC = () => {
   const renderSuccessMessage = () => {
     if (!uploadSuccess) return null;
 
+    // Check if we're dealing with a duplicate file
+    const isDuplicate = selectedFile?.isDuplicate;
+
     return (
       <div className="mt-4 p-3 bg-[color-mix(in_srgb,var(--color-success-light)_15%,transparent)] border border-[var(--color-success)] rounded-md text-[var(--color-success)] text-sm flex items-center">
         <svg
@@ -124,7 +196,7 @@ const VideoUpload: React.FC = () => {
           <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
           <polyline points="22 4 12 14.01 9 11.01"></polyline>
         </svg>
-        Upload successful! {generatingSubtitles ? 'Generating subtitles...' : 'Redirecting to subtitle preview...'}
+        {isDuplicate ? 'Duplicate file detected!' : 'Upload successful!'} {generatingSubtitles ? 'Generating subtitles...' : 'Redirecting to subtitle preview...'}
       </div>
     );
   };

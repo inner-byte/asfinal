@@ -5,6 +5,7 @@ import routes from './routes';
 import { errorHandler } from './middleware/errorHandler';
 import { initializeAppwrite } from './config/appwriteInit';
 import { redisClient } from './config/redis';
+import redisMonitoringService from './services/redisMonitoringService';
 import backgroundJobService from './services/backgroundJobService';
 
 // Load environment variables
@@ -20,15 +21,47 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Health check route with service status
-app.get('/health', (_req: Request, res: Response) => {
+app.get('/health', async (_req: Request, res: Response) => {
   // Check Redis status
   const redisStatus = redisClient.status === 'ready' ? 'connected' : 'disconnected';
+
+  // Get Redis memory info if connected
+  let redisMemoryInfo = null;
+  let fileHashStats = null;
+
+  if (redisStatus === 'connected') {
+    try {
+      redisMemoryInfo = await redisMonitoringService.getMemoryInfo();
+      fileHashStats = await redisMonitoringService.getFileHashStats();
+    } catch (error) {
+      console.error('Error getting Redis info for health check:', error);
+    }
+  }
 
   res.status(200).json({
     status: 'ok',
     message: 'Server is running',
     services: {
-      redis: redisStatus
+      redis: {
+        status: redisStatus,
+        memory: redisMemoryInfo ? {
+          usedMemoryHuman: redisMemoryInfo.usedMemoryHuman,
+          memoryUsagePercentage: redisMemoryInfo.memoryUsagePercentage.toFixed(2) + '%',
+          maxmemoryHuman: redisMemoryInfo.maxmemoryHuman,
+          maxmemoryPolicy: redisMemoryInfo.maxmemoryPolicy
+        } : null,
+        fileHashes: fileHashStats ? {
+          totalHashes: fileHashStats.totalHashes,
+          hashesWithSubtitles: fileHashStats.hashesWithSubtitles,
+          hashesWithoutSubtitles: fileHashStats.hashesWithoutSubtitles
+        } : null
+      }
+    },
+    monitoringEndpoints: {
+      redisStatus: '/api/redis/status',
+      redisKeys: '/api/redis/keys',
+      redisFileHashes: '/api/redis/file-hashes',
+      redisCleanup: '/api/redis/cleanup'
     }
   });
 });
@@ -65,19 +98,12 @@ app.use(errorHandler);
 // Initialize Appwrite resources and start server
 (async () => {
   try {
-    // Initialize Redis connection
-    console.log('Checking Redis connection...');
-    if (redisClient.status !== 'ready') {
-      console.log('Redis not ready, attempting to connect...');
-      try {
-        await redisClient.connect();
-        console.log('Redis connection established successfully');
-      } catch (redisError) {
-        console.error('Failed to connect to Redis:', redisError);
-        console.warn('Continuing without Redis - caching will be disabled');
-      }
+    // Check Redis connection status
+    console.log('Checking Redis connection status...');
+    if (redisClient.status === 'ready') {
+      console.log('Redis is connected and ready');
     } else {
-      console.log('Redis already connected');
+      console.warn('Redis is not ready - caching functionality may be limited');
     }
 
     console.log('Initializing Appwrite resources...');

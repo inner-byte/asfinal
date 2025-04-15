@@ -63,13 +63,9 @@ try {
     console.log('Redis connection ended');
   });
 
-  // Explicitly connect to Redis if not using lazyConnect
-  if (!redisOptions.lazyConnect) {
-    console.log('Attempting to connect to Redis...');
-    redisClient.connect().catch(err => {
-      console.error('Failed to connect to Redis:', err);
-    });
-  }
+  // No need to explicitly connect when lazyConnect is false
+  // IORedis will automatically connect when created
+  console.log('Redis client created with auto-connect enabled');
 } catch (error) {
   console.error('Error creating Redis client:', error);
   // Create a dummy client that doesn't actually connect to Redis

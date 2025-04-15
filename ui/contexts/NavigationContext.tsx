@@ -16,6 +16,19 @@ export const WORKFLOW_STEPS = [
   { name: 'Export', route: '/export', order: 3 },
 ];
 
+// Define video and subtitle info types
+export interface VideoInfo {
+  id: string;
+  name: string;
+  isDuplicate?: boolean;
+}
+
+export interface SubtitleInfo {
+  id: string;
+  videoId: string;
+  isDuplicate?: boolean;
+}
+
 // Define context types
 type NavigationContextType = {
   currentStep: number;
@@ -25,10 +38,12 @@ type NavigationContextType = {
   goToPrevStep: () => void;
   canGoNext: boolean;
   canGoPrev: boolean;
-  setVideoUploaded: (uploaded: boolean) => void;
+  setVideoUploaded: (info: VideoInfo | boolean) => void;
   videoUploaded: boolean;
-  setSubtitlesGenerated: (generated: boolean) => void;
+  videoInfo: VideoInfo | null;
+  setSubtitlesGenerated: (info: SubtitleInfo | boolean) => void;
   subtitlesGenerated: boolean;
+  subtitleInfo: SubtitleInfo | null;
 };
 
 // Create the navigation context
@@ -45,6 +60,8 @@ export function NavigationProvider({ children }: NavigationProviderProps) {
   const router = useRouter();
   const [videoUploaded, setVideoUploaded] = useState(false);
   const [subtitlesGenerated, setSubtitlesGenerated] = useState(false);
+  const [videoInfo, setVideoInfo] = useState<VideoInfo | null>(null);
+  const [subtitleInfo, setSubtitleInfo] = useState<SubtitleInfo | null>(null);
 
   // Find the current step based on the current route
   const getCurrentStepOrder = () => {
@@ -99,6 +116,28 @@ export function NavigationProvider({ children }: NavigationProviderProps) {
   // Check if we can go to the previous step
   const canGoPrev = currentStep > 0;
 
+  // Handle setting video uploaded state and info
+  const handleSetVideoUploaded = (info: VideoInfo | boolean) => {
+    if (typeof info === 'boolean') {
+      setVideoUploaded(info);
+      if (!info) setVideoInfo(null);
+    } else {
+      setVideoUploaded(true);
+      setVideoInfo(info);
+    }
+  };
+
+  // Handle setting subtitles generated state and info
+  const handleSetSubtitlesGenerated = (info: SubtitleInfo | boolean) => {
+    if (typeof info === 'boolean') {
+      setSubtitlesGenerated(info);
+      if (!info) setSubtitleInfo(null);
+    } else {
+      setSubtitlesGenerated(true);
+      setSubtitleInfo(info);
+    }
+  };
+
   // Context value
   const value = {
     currentStep,
@@ -108,10 +147,12 @@ export function NavigationProvider({ children }: NavigationProviderProps) {
     goToPrevStep,
     canGoNext,
     canGoPrev,
-    setVideoUploaded,
+    setVideoUploaded: handleSetVideoUploaded,
     videoUploaded,
-    setSubtitlesGenerated,
+    videoInfo,
+    setSubtitlesGenerated: handleSetSubtitlesGenerated,
     subtitlesGenerated,
+    subtitleInfo,
   };
 
   return (

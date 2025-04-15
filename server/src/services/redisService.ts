@@ -5,9 +5,10 @@ import {
   deleteCachePattern,
   generateVideoKey,
   generateSubtitleKey,
-  redisClient
+  redisClient,
+  DEFAULT_EXPIRATION_TIME
 } from '../config/redis'; // Functions now directly use Redis
-import { Video } from '../types';
+import { Video, Subtitle } from '../types';
 
 /**
  * Service for interacting with the Redis cache.
@@ -133,6 +134,65 @@ export class RedisService {
       return true; // Already connected
     } catch (error) {
       console.error('Error connecting to Redis:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Store a file hash with associated video and subtitle information
+   * @param fileHash The SHA-256 hash of the file content
+   * @param videoData Object containing videoId and optional subtitleId
+   * @param expirationSeconds Cache expiration time in seconds (default: 30 days)
+   */
+  async storeFileHash(
+    fileHash: string,
+    videoData: { videoId: string, subtitleId?: string },
+    expirationSeconds: number = 60 * 60 * 24 * 30
+  ): Promise<void> {
+    const key = `file:hash:${fileHash}`;
+    await setCacheValue(key, videoData, expirationSeconds);
+  }
+
+  /**
+   * Get video information by file hash
+   * @param fileHash The SHA-256 hash of the file content
+   * @returns Object containing videoId and optional subtitleId, or null if not found
+   */
+  async getVideoByFileHash(fileHash: string): Promise<{ videoId: string, subtitleId?: string } | null> {
+    const key = `file:hash:${fileHash}`;
+    return getCacheValue<{ videoId: string, subtitleId?: string }>(key);
+  }
+
+  /**
+   * Update subtitle information for an existing file hash
+   * @param fileHash The SHA-256 hash of the file content
+   * @param subtitleId The ID of the generated subtitle
+   * @returns True if the update was successful, false otherwise
+   */
+  async updateFileHashWithSubtitle(fileHash: string, subtitleId: string): Promise<boolean> {
+    const key = `file:hash:${fileHash}`;
+    const existingData = await getCacheValue<{ videoId: string, subtitleId?: string }>(key);
+
+    if (!existingData) {
+      return false;
+    }
+
+    await setCacheValue(key, { ...existingData, subtitleId }, 60 * 60 * 24 * 30);
+    return true;
+  }
+
+  /**
+   * Delete a file hash from Redis
+   * @param fileHash The SHA-256 hash of the file content
+   * @returns True if the deletion was successful, false otherwise
+   */
+  async deleteFileHash(fileHash: string): Promise<boolean> {
+    try {
+      const key = `file:hash:${fileHash}`;
+      await deleteCacheValue(key);
+      return true;
+    } catch (error) {
+      console.error(`Error deleting file hash ${fileHash}:`, error);
       return false;
     }
   }

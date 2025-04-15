@@ -22,9 +22,14 @@ const poppins = Poppins({
 export const metadata: Metadata = {
   title: "AI Subtitle Generator",
   description: "Generate accurate subtitles for your videos with AI",
-  viewport: "width=device-width, initial-scale=1",
-  themeColor: "#111827", // Dark gray base color from our design system
 };
+
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+};
+
+export const themeColor = "#111827"; // Dark gray base color from our design system
 
 export default function RootLayout({
   children,
@@ -33,7 +38,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark scroll-smooth">
-      <body 
+      <body
         className={`${inter.variable} ${poppins.variable} font-sans antialiased bg-[var(--background-primary)] text-[var(--foreground-primary)]`}
       >
         <NavigationProvider>
@@ -54,32 +59,32 @@ export default function RootLayout({
                   <nav>
                     <ul className="flex items-center gap-5">
                       <li>
-                        <Link 
-                          href="/video-upload" 
+                        <Link
+                          href="/video-upload"
                           className="text-sm hover:text-[var(--color-primary-400)] transition-colors"
                         >
                           Upload
                         </Link>
                       </li>
                       <li>
-                        <Link 
-                          href="/subtitle-preview" 
+                        <Link
+                          href="/subtitle-preview"
                           className="text-sm hover:text-[var(--color-primary-400)] transition-colors"
                         >
                           Preview
                         </Link>
                       </li>
                       <li>
-                        <Link 
-                          href="/export" 
+                        <Link
+                          href="/export"
                           className="text-sm hover:text-[var(--color-primary-400)] transition-colors"
                         >
                           Export
                         </Link>
                       </li>
                       <li>
-                        <Link 
-                          href="/video-upload" 
+                        <Link
+                          href="/video-upload"
                           className="button button-gradient animate-gradient bg-gradient-size text-sm"
                         >
                           Get Started
@@ -90,11 +95,11 @@ export default function RootLayout({
                 </div>
               </div>
             </header>
-            
+
             <main className="flex-1">
               {children}
             </main>
-            
+
             <footer className="border-t border-[var(--color-gray-800)] py-4">
               <div className="container-custom">
                 <div className="flex flex-col md:flex-row justify-between items-center gap-4">

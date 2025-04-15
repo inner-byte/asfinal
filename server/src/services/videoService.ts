@@ -14,6 +14,7 @@ import { Video } from '../types';
 import { AppError } from '../middleware/errorHandler';
 import redisService from './redisService'; // Keep for other methods like deleteCachedVideo etc.
 import { AppwriteException } from 'node-appwrite'; // Import AppwriteException
+import { redisClient } from '../config/redis'; // Import redisClient for direct Redis operations
 
 /**
  * Service for handling video operations
@@ -211,11 +212,21 @@ export class VideoService {
     try {
       console.log(`Getting video stream for fileId: ${fileId}`);
 
-      // Get the download URL for the file
-      const downloadUrl = await storage.getFileDownload(VIDEOS_BUCKET_ID, fileId);
+      // Construct the direct URL instead of using storage.getFileDownload
+      const appwriteEndpoint = process.env.APPWRITE_ENDPOINT || 'https://cloud.appwrite.io/v1';
+      const baseUrl = appwriteEndpoint.endsWith('/') ? appwriteEndpoint.slice(0, -1) : appwriteEndpoint;
+      const directUrl = `${baseUrl}/storage/buckets/${VIDEOS_BUCKET_ID}/files/${fileId}/download`;
+
+      console.log(`Constructed direct download URL: ${directUrl}`);
+
+      // Add authentication headers for Appwrite
+      const headers: Record<string, string> = {
+        'X-Appwrite-Project': process.env.APPWRITE_PROJECT_ID || '',
+        'X-Appwrite-Key': process.env.APPWRITE_API_KEY || ''
+      };
 
       // Fetch the file using node-fetch
-      const response = await fetch(downloadUrl.toString());
+      const response = await fetch(directUrl, { headers });
 
       // Check if the response is OK
       if (!response.ok) {
@@ -274,17 +285,19 @@ export class VideoService {
 
       console.log(`Found video with fileId: ${video.fileId}`);
 
-      // Directly construct the URL using the Appwrite endpoint and API
-      // This is more reliable than using the SDK's getFileView/getFileDownload methods
-      const appwriteEndpoint = process.env.APPWRITE_ENDPOINT || 'https://cloud.appwrite.io/v1';
-      const baseUrl = appwriteEndpoint.endsWith('/') ? appwriteEndpoint.slice(0, -1) : appwriteEndpoint;
+      try {
+        // Instead of using storage.getFileDownload which returns an object that can't be properly converted to URL,
+        // construct the URL directly using the Appwrite endpoint and file ID
+        const appwriteEndpoint = process.env.APPWRITE_ENDPOINT || 'https://cloud.appwrite.io/v1';
+        const baseUrl = appwriteEndpoint.endsWith('/') ? appwriteEndpoint.slice(0, -1) : appwriteEndpoint;
+        const directUrl = `${baseUrl}/storage/buckets/${VIDEOS_BUCKET_ID}/files/${video.fileId}/download`;
 
-      // Use the /view endpoint which doesn't trigger a download header
-      // This is better for streaming and processing
-      const directUrl = `${baseUrl}/storage/buckets/${VIDEOS_BUCKET_ID}/files/${video.fileId}/view`;
-
-      console.log(`Constructed direct URL: ${directUrl}`);
-      return directUrl;
+        console.log(`Constructed direct download URL: ${directUrl}`);
+        return directUrl;
+      } catch (error: any) {
+        console.error('Error constructing download URL:', error);
+        throw new AppError(`Failed to construct download URL: ${error.message || 'Unknown error'}`, 500);
+      }
     } catch (error: any) {
       console.error('Error getting video download URL:', error);
       throw new AppError(`Failed to get video download URL: ${error.message || 'Unknown error'}`, 500);
@@ -310,13 +323,65 @@ export class VideoService {
       );
 
       // Invalidate caches
-      await redisService.deleteCachedVideo(id); // Restore Redis call
-      await redisService.deleteCachedSubtitle(id); // Restore Redis call
-      await redisService.deleteAllCachedVideos(); // Restore Redis call for list invalidation
+      await redisService.deleteCachedVideo(id);
+      await redisService.deleteCachedSubtitle(id);
+      await redisService.deleteAllCachedVideos();
+
+      // Clean up any file hashes that reference this video
+      await this.cleanupFileHashesForVideo(id);
 
     } catch (error: any) {
       console.error('Error deleting video:', error);
       throw new AppError(`Failed to delete video: ${error.message || 'Unknown error'}`, 500);
+    }
+  }
+
+  /**
+   * Clean up any file hashes that reference a specific video
+   * @param videoId The ID of the video
+   */
+  private async cleanupFileHashesForVideo(videoId: string): Promise<void> {
+    try {
+      if (redisClient.status !== 'ready') {
+        console.warn(`Redis not ready, skipping file hash cleanup for video ${videoId}`);
+        return;
+      }
+
+      console.log(`Cleaning up file hashes for deleted video ${videoId}`);
+      let removedCount = 0;
+      let cursor = '0';
+
+      do {
+        const reply = await redisClient.scan(cursor, 'MATCH', 'file:hash:*', 'COUNT', '100');
+        cursor = reply[0];
+        const keys = reply[1];
+
+        for (const key of keys) {
+          const value = await redisClient.get(key);
+          if (value) {
+            try {
+              const data = JSON.parse(value);
+              if (data.videoId === videoId) {
+                // This hash references the deleted video, remove it
+                await redisClient.del(key);
+                removedCount++;
+                console.log(`Removed file hash ${key.substring(10)} that referenced deleted video ${videoId}`);
+              }
+            } catch (e) {
+              console.warn(`Error parsing JSON for key ${key}:`, e);
+            }
+          }
+        }
+      } while (cursor !== '0');
+
+      if (removedCount > 0) {
+        console.log(`Removed ${removedCount} file hash${removedCount === 1 ? '' : 'es'} that referenced deleted video ${videoId}`);
+      } else {
+        console.log(`No file hashes found referencing deleted video ${videoId}`);
+      }
+    } catch (error) {
+      console.error(`Error cleaning up file hashes for video ${videoId}:`, error);
+      // Don't throw, just log the error
     }
   }
 

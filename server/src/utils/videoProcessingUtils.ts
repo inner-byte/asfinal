@@ -48,19 +48,23 @@ export async function prepareVideoForProcessing(videoId: string): Promise<{ vide
     try {
         console.log(`[VideoProcessingUtils] Fetching video from URL: ${videoUrl}`);
 
-        // Try to validate the URL before fetching
+        // Validate the URL
         try {
-            new URL(videoUrl.toString());
+            new URL(videoUrl);
         } catch (urlError: any) {
             console.error(`[VideoProcessingUtils] Invalid URL format: ${videoUrl}`);
             throw new AppError(`Invalid video URL format: ${urlError.message || 'Invalid URL'}`, 500);
         }
 
-        // Add authentication headers if needed - only if URL is from Appwrite
-        const headers: Record<string, string> = {};
-        if (videoUrl.toString().includes(process.env.APPWRITE_ENDPOINT || '')) {
-            headers['X-Appwrite-Project'] = process.env.APPWRITE_PROJECT_ID || '';
-            headers['X-Appwrite-Key'] = process.env.APPWRITE_API_KEY || '';
+        // Add authentication headers for Appwrite
+        const headers: Record<string, string> = {
+            'X-Appwrite-Project': process.env.APPWRITE_PROJECT_ID || '',
+            'X-Appwrite-Key': process.env.APPWRITE_API_KEY || ''
+        };
+
+        // Add JWT if available
+        if (process.env.APPWRITE_JWT) {
+            headers['X-Appwrite-JWT'] = process.env.APPWRITE_JWT;
         }
 
         // Create an AbortController for timeout handling
@@ -69,7 +73,7 @@ export async function prepareVideoForProcessing(videoId: string): Promise<{ vide
 
         try {
             console.log(`[VideoProcessingUtils] Attempting to fetch video from URL: ${videoUrl}`);
-            response = await fetch(videoUrl.toString(), {
+            response = await fetch(videoUrl, {
                 headers,
                 signal: controller.signal
             });
@@ -77,6 +81,14 @@ export async function prepareVideoForProcessing(videoId: string): Promise<{ vide
             console.log(`[VideoProcessingUtils] Fetch response status: ${response.status} ${response.statusText}`);
 
             if (!response.ok) {
+                // Special handling for 404 errors
+                if (response.status === 404) {
+                    throw new AppError(
+                        `Video file not found in storage. This may happen if the file was deleted or if the file ID is incorrect. ` +
+                        `Video ID: ${videoId}, File ID: ${video.fileId}`,
+                        404
+                    );
+                }
                 throw new AppError(`Failed to fetch video stream: ${response.statusText} (${response.status})`, response.status);
             }
             if (!response.body) {

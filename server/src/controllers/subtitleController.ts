@@ -3,6 +3,8 @@ import { ApiResponse, Subtitle, SubtitleGenerationStatus } from '../types';
 import { AppError } from '../middleware/errorHandler';
 import subtitleService from '../services/subtitleService'; // Import the singleton instance
 import backgroundJobService from '../services/backgroundJobService'; // Import the background job service
+import redisService from '../services/redisService'; // Import Redis service
+import { redisClient } from '../config/redis'; // Import Redis client
 
 // Note: Express body-parser limit is set in index.ts
 
@@ -48,6 +50,59 @@ export class SubtitleController {
       } else {
         // Use the subtitle service to generate subtitles synchronously (legacy mode)
         const subtitle = await subtitleService.generateSubtitles(videoId, language);
+
+        // Try to update the file hash record with the subtitle ID
+        try {
+          // Instead of downloading the entire file again, use a simpler approach
+          // Just try to find the hash directly from Redis
+
+          if (redisClient.status !== 'ready') {
+            console.warn('Redis not ready, skipping file hash update');
+          } else {
+            // Get all file hashes that point to this video ID
+            let cursor = '0';
+            let fileHash = null;
+
+            do {
+              const reply = await redisClient.scan(cursor, 'MATCH', 'file:hash:*', 'COUNT', '100');
+              cursor = reply[0];
+              const keys = reply[1];
+
+              // Check each key to find one that points to our video ID
+              for (const key of keys) {
+                const value = await redisClient.get(key);
+                if (value) {
+                  try {
+                    const data = JSON.parse(value);
+                    if (data.videoId === videoId) {
+                      // Extract the hash from the key (remove the 'file:hash:' prefix)
+                      fileHash = key.substring(10);
+                      break;
+                    }
+                  } catch (e) {
+                    console.warn(`Error parsing JSON for key ${key}:`, e);
+                  }
+                }
+              }
+
+              // If we found a hash, break out of the loop
+              if (fileHash) {
+                break;
+              }
+            } while (cursor !== '0');
+
+            if (fileHash) {
+              // Update the hash record with the subtitle ID
+              await redisService.updateFileHashWithSubtitle(fileHash, subtitle.id);
+              console.log(`Updated file hash ${fileHash} with subtitle ID ${subtitle.id}`);
+            } else {
+              console.warn(`Could not find file hash for video ID ${videoId}, skipping update`);
+            }
+          }
+        } catch (error) {
+          // Log but don't fail if updating the hash record fails
+          console.warn(`Failed to update file hash record with subtitle ID: ${error}`);
+        }
 
         // Construct detailed response
         const response: ApiResponse<Subtitle> = {

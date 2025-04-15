@@ -33,6 +33,13 @@ export interface VideoFile {
   type: string;
   uploadedAt?: Date;
   url?: string;
+  isDuplicate?: boolean;
+  duplicateData?: {
+    videoId: string;
+    subtitleId?: string;
+    videoData?: any;
+    subtitleData?: any;
+  };
 }
 
 export interface UseVideoUploadResult {
@@ -278,7 +285,31 @@ export function useVideoUpload(): UseVideoUploadResult {
                 return;
               }
 
-              const videoData = response.data;
+              const responseData = response.data;
+
+              // Check if this is a duplicate detection response
+              if (responseData.isDuplicate === true) {
+                console.log('Duplicate file detected:', responseData);
+
+                resolve({
+                  file,
+                  id: responseData.videoId,
+                  name: file.name,
+                  size: file.size,
+                  type: file.type,
+                  isDuplicate: true,
+                  duplicateData: {
+                    videoId: responseData.videoId,
+                    subtitleId: responseData.subtitleId,
+                    videoData: responseData.videoData,
+                    subtitleData: responseData.subtitleData
+                  }
+                });
+                return;
+              }
+
+              // Handle normal upload response
+              const videoData = responseData;
 
               // Validate that the video data contains the required fields
               if (!videoData || !videoData.id) {
@@ -294,6 +325,7 @@ export function useVideoUpload(): UseVideoUploadResult {
                 size: videoData.fileSize || file.size,
                 type: videoData.mimeType || file.type,
                 uploadedAt: new Date(videoData.updatedAt || Date.now()),
+                isDuplicate: false
               });
             } catch (parseError) {
               console.error("Error parsing upload response:", parseError, xhr.responseText);

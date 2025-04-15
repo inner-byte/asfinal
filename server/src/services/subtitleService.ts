@@ -4,6 +4,7 @@ import fs from 'fs';
 import { Readable } from 'stream';
 import { Job } from 'bullmq';
 import { validateSubtitleDocument } from '../utils/validationUtils';
+import videoService from './videoService';
 
 // Import configurations
 import {
@@ -470,8 +471,14 @@ export class SubtitleService {
     try {
       console.log(`[SubtitleService] Creating pending subtitle document for video ${videoId}`);
 
-      // Get the video document to access the name
-      const { video } = await prepareVideoForProcessing(videoId);
+      // First, check if the video exists in the database without trying to fetch the file
+      // This avoids the 404 error when the file is missing but we have the video metadata
+      const video = await videoService.getVideoById(videoId);
+      if (!video) {
+        throw new AppError(`Video with ID ${videoId} not found`, 404);
+      }
+
+      // Create a default subtitle name without trying to access the file
       const subtitleName = `${video.name.split('.')[0]}_${language}.vtt`;
 
       const documentId = ID.unique();
