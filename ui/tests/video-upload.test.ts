@@ -7,9 +7,12 @@
 
 import { renderHook, act } from '@testing-library/react-hooks';
 import { useVideoUpload } from '../hooks/useVideoUpload';
+import fetchMock from 'jest-fetch-mock';
 
-// Mock API base URL
-const API_BASE_URL = 'http://localhost:3001/api';
+// Use the environment variable, consistent with other files
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001/api';
+
+fetchMock.enableMocks();
 
 // Mock fetch for API requests
 global.fetch = jest.fn().mockImplementation((url) => {

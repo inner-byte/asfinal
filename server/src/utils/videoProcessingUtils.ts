@@ -3,11 +3,13 @@ import { Readable } from 'stream';
 import videoService from '../services/videoService'; // Assuming videoService handles Appwrite interactions for video metadata
 import { AppError } from '../middleware/errorHandler';
 import { Video } from '../types'; // Assuming a Video type exists
+import AUDIO_PROCESSING from '../config/audioProcessing';
 
 /**
  * Maximum allowed video size (4GB as per project requirements).
+ * Using centralized configuration from audioProcessing.ts
  */
-const MAX_VIDEO_SIZE_BYTES = 4 * 1024 * 1024 * 1024; // 4GB
+const MAX_VIDEO_SIZE_BYTES = AUDIO_PROCESSING.MAX_VIDEO_SIZE_BYTES;
 
 /**
  * Fetches video metadata, validates it, and returns the video object and a readable stream.
@@ -40,7 +42,7 @@ export async function prepareVideoForProcessing(videoId: string): Promise<{ vide
 
     // 4. Fetch video stream
     const fetchOptions = {
-        timeout: 60000, // Increased timeout to 60 seconds for potentially large files
+        timeout: AUDIO_PROCESSING.FETCH_TIMEOUT, // Using centralized configuration
     };
     let response;
     try {
@@ -54,26 +56,34 @@ export async function prepareVideoForProcessing(videoId: string): Promise<{ vide
             throw new AppError(`Invalid video URL format: ${urlError.message || 'Invalid URL'}`, 500);
         }
 
-        // Add authentication headers if needed
-        const headers = {
-            'X-Appwrite-Project': process.env.APPWRITE_PROJECT_ID || '',
-            'X-Appwrite-Key': process.env.APPWRITE_API_KEY || '',
-        };
-
-        console.log(`[VideoProcessingUtils] Attempting to fetch video from URL: ${videoUrl}`);
-        response = await fetch(videoUrl.toString(), {
-            ...fetchOptions,
-            headers
-            // Note: 'credentials' option is not available in node-fetch
-        });
-
-        console.log(`[VideoProcessingUtils] Fetch response status: ${response.status} ${response.statusText}`);
-
-        if (!response.ok) {
-            throw new AppError(`Failed to fetch video stream: ${response.statusText} (${response.status})`, response.status);
+        // Add authentication headers if needed - only if URL is from Appwrite
+        const headers: Record<string, string> = {};
+        if (videoUrl.toString().includes(process.env.APPWRITE_ENDPOINT || '')) {
+            headers['X-Appwrite-Project'] = process.env.APPWRITE_PROJECT_ID || '';
+            headers['X-Appwrite-Key'] = process.env.APPWRITE_API_KEY || '';
         }
-        if (!response.body) {
-            throw new AppError('Video response body is null or undefined', 500);
+
+        // Create an AbortController for timeout handling
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), fetchOptions.timeout);
+
+        try {
+            console.log(`[VideoProcessingUtils] Attempting to fetch video from URL: ${videoUrl}`);
+            response = await fetch(videoUrl.toString(), {
+                headers,
+                signal: controller.signal
+            });
+
+            console.log(`[VideoProcessingUtils] Fetch response status: ${response.status} ${response.statusText}`);
+
+            if (!response.ok) {
+                throw new AppError(`Failed to fetch video stream: ${response.statusText} (${response.status})`, response.status);
+            }
+            if (!response.body) {
+                throw new AppError('Video response body is null or undefined', 500);
+            }
+        } finally {
+            clearTimeout(timeoutId);
         }
     } catch (error: any) {
         console.error(`[VideoProcessingUtils] Fetch error details:`, error);
@@ -82,8 +92,8 @@ export async function prepareVideoForProcessing(videoId: string): Promise<{ vide
             throw error;
         }
 
-        if (error.type === 'request-timeout') {
-            throw new AppError(`Fetch timeout after ${fetchOptions.timeout}ms while fetching video: ${error.message}`, 408);
+        if (error.name === 'AbortError') {
+            throw new AppError(`Fetch timeout after ${fetchOptions.timeout}ms while fetching video`, 408);
         }
 
         // Wrap other fetch errors

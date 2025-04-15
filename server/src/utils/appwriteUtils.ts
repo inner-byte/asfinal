@@ -2,6 +2,9 @@ import { ID } from 'node-appwrite';
 import { InputFile } from 'node-appwrite/file';
 import fs from 'fs';
 import path from 'path';
+import { createReadStream } from 'fs';
+import { pipeline } from 'stream/promises';
+import { validateSubtitleDocument } from './validationUtils';
 import {
     storage,
     databases,
@@ -11,8 +14,10 @@ import {
     createDocumentPermissions,
     createFilePermissions
 } from '../config/appwrite';
-import { Subtitle, SubtitleFormat, SubtitleGenerationStatus } from '../types'; // Assuming types are defined
+import { Subtitle, SubtitleFormat, SubtitleGenerationStatus } from '../types';
 import { AppError } from '../middleware/errorHandler';
+import AUDIO_PROCESSING from '../config/audioProcessing';
+import retry from 'async-retry';
 
 /**
  * Uploads a VTT file from a temporary path to Appwrite Storage.
@@ -25,17 +30,48 @@ import { AppError } from '../middleware/errorHandler';
 export async function uploadVttToAppwrite(vttTempFilePath: string, desiredFileId: string): Promise<string> {
     console.log(`[AppwriteUtils] Uploading VTT file from ${vttTempFilePath} to Appwrite Storage with ID ${desiredFileId}`);
     try {
-        // Read the file content and create an InputFile
-        const fileContent = await fs.promises.readFile(vttTempFilePath);
-        const inputFile = InputFile.fromBuffer(fileContent, path.basename(vttTempFilePath));
-
-        // Upload the file to Appwrite
-        const uploadedFile = await storage.createFile(
-            SUBTITLES_BUCKET_ID,
-            desiredFileId,
-            inputFile,
-            createFilePermissions()
+        // Read file into buffer instead of using stream (InputFile.fromStream is not available in node-appwrite 15.0.1)
+        const fileBuffer = fs.readFileSync(vttTempFilePath);
+        const inputFile = InputFile.fromBuffer(
+            fileBuffer,
+            path.basename(vttTempFilePath)
+            // Note: MIME type is automatically detected or can be inferred from the filename
         );
+
+        // Upload the file to Appwrite with retry logic for transient errors
+        const uploadedFile = await retry(
+            async (bail) => {
+                try {
+                    return await storage.createFile(
+                        SUBTITLES_BUCKET_ID,
+                        desiredFileId,
+                        inputFile,
+                        createFilePermissions()
+                    );
+                } catch (error: any) {
+                    // Don't retry client errors (4xx)
+                    if (error.code >= 400 && error.code < 500) {
+                        bail(error);
+                        return null; // This will never be reached due to bail()
+                    }
+                    throw error; // Retry on server errors (5xx)
+                }
+            },
+            {
+                retries: 3,
+                minTimeout: 1000,
+                maxTimeout: 5000,
+                factor: 2,
+                onRetry: (error, attempt) => {
+                    console.warn(`[AppwriteUtils] Retry attempt ${attempt} to upload file ${desiredFileId}: ${error.message}`);
+                }
+            }
+        );
+
+        if (!uploadedFile) {
+            throw new Error('File upload failed after retries');
+        }
+
         console.log(`[AppwriteUtils] VTT file uploaded successfully: ${uploadedFile.$id}`);
         return uploadedFile.$id;
     } catch (error: any) {
@@ -58,19 +94,35 @@ export async function createSubtitleDocumentInAppwrite(
     videoId: string,
     fileId: string,
     language: string,
-    videoDuration: number
+    videoDuration: number,
+    name?: string // Add optional name parameter
 ): Promise<Subtitle> {
     console.log(`[AppwriteUtils] Creating subtitle document in Appwrite Database for video ${videoId}, file ${fileId}`);
     const documentId = ID.unique(); // Generate unique ID for the document
+    // Generate a default name if not provided
+    const defaultName = `subtitle_${videoId}_${language}.vtt`;
+
+    // Get file size information from storage if possible
+    let fileSize = 0;
+    try {
+        const fileInfo = await storage.getFile(SUBTITLES_BUCKET_ID, fileId);
+        fileSize = fileInfo.sizeOriginal;
+    } catch (error) {
+        console.warn(`[AppwriteUtils] Could not get file size for ${fileId}, using default value of 0`);
+    }
+
     const subtitleDocData = {
         videoId,
         fileId,
         format: SubtitleFormat.VTT,
         language,
+        name: name || defaultName, // Use provided name or default
+        fileSize, // Add fileSize attribute
+        mimeType: 'text/vtt', // Add mimeType attribute for VTT format
         generatedAt: new Date().toISOString(),
         status: SubtitleGenerationStatus.COMPLETED,
         processingMetadata: JSON.stringify({
-            model: 'gemini-2.0-flash', // Consider making this dynamic
+            model: AUDIO_PROCESSING.GEMINI_MODEL, // Using centralized configuration
             audioFormat: 'flac',
             duration: videoDuration,
             processedAt: new Date().toISOString()
@@ -78,6 +130,9 @@ export async function createSubtitleDocumentInAppwrite(
     };
 
     try {
+        // Validate the document before creating it
+        validateSubtitleDocument(subtitleDocData);
+
         const subtitleDoc = await databases.createDocument(
             DATABASE_ID,
             SUBTITLES_COLLECTION_ID,
@@ -94,9 +149,14 @@ export async function createSubtitleDocumentInAppwrite(
             format: subtitleDoc.format as SubtitleFormat,
             fileId: subtitleDoc.fileId,
             language: subtitleDoc.language,
+            name: subtitleDoc.name,
+            fileSize: subtitleDoc.fileSize,
+            mimeType: subtitleDoc.mimeType,
+            status: subtitleDoc.status as SubtitleGenerationStatus,
+            processingMetadata: subtitleDoc.processingMetadata,
+            generatedAt: subtitleDoc.generatedAt ? new Date(subtitleDoc.generatedAt) : undefined,
             createdAt: new Date(subtitleDoc.$createdAt),
             updatedAt: new Date(subtitleDoc.$updatedAt)
-            // Include other fields from Subtitle type if necessary
         };
     } catch (error: any) {
         console.error(`[AppwriteUtils] Failed to create subtitle document for file ${fileId}: ${error.message}`, error.stack);

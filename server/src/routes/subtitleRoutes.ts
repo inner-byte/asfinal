@@ -4,7 +4,8 @@ import {
   getSubtitlesByVideoId,
   getSubtitleById,
   getSubtitleContent,
-  deleteSubtitle
+  deleteSubtitle,
+  getJobStatus
 } from '../controllers/subtitleController';
 
 const router = Router();

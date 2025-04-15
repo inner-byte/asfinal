@@ -3,6 +3,13 @@ import { Readable } from 'stream';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
+import { promisify } from 'util';
+import AUDIO_PROCESSING from '../config/audioProcessing';
+
+// Promisify fs functions for async usage
+const fsAccess = promisify(fs.access);
+const fsStat = promisify(fs.stat);
+const fsUnlink = promisify(fs.unlink);
 
 /**
  * Extracts audio from a video stream and saves it to a temporary local file.
@@ -23,9 +30,9 @@ export async function extractAudioToTempFile(
 ): Promise<{ tempFilePath: string; mimeType: string }> {
   // Configure default options
   const {
-    audioFrequency = 16000,
-    audioChannels = 1,
-    logLevel = 'info'
+    audioFrequency = AUDIO_PROCESSING.FREQUENCY,
+    audioChannels = AUDIO_PROCESSING.CHANNELS,
+    logLevel = AUDIO_PROCESSING.LOG_LEVEL
   } = options;
 
   // Create a unique filename with timestamp and random suffix
@@ -79,16 +86,21 @@ export async function extractAudioToTempFile(
         try {
           // Verify the file exists and has content using async methods
           try {
-            await fs.promises.access(tempFilePath, fs.constants.F_OK);
-          } catch {
-            reject(new Error('FFmpeg completed but output file is missing'));
+            await fsAccess(tempFilePath, fs.constants.F_OK);
+          } catch (accessError) {
+            reject(new Error(`FFmpeg completed but output file is missing: ${accessError.message}`));
             return;
           }
 
-          const fileStats = await fs.promises.stat(tempFilePath);
-          if (fileStats.size === 0) {
-            await cleanupTempFile(tempFilePath);
-            reject(new Error('FFmpeg completed but output file is empty'));
+          try {
+            const fileStats = await fsStat(tempFilePath);
+            if (fileStats.size === 0) {
+              await cleanupTempFile(tempFilePath);
+              reject(new Error('FFmpeg completed but output file is empty'));
+              return;
+            }
+          } catch (statError) {
+            reject(new Error(`FFmpeg completed but failed to check file size: ${statError.message}`));
             return;
           }
 
@@ -115,20 +127,22 @@ export async function cleanupTempFile(filePath: string): Promise<void> {
   }
 
   try {
-    // Check if file exists using async fs.promises.access
+    // Check if file exists using promisified fs.access
     try {
-      await fs.promises.access(filePath, fs.constants.F_OK);
-    } catch {
+      await fsAccess(filePath, fs.constants.F_OK);
+    } catch (accessError) {
       // File doesn't exist, no need to delete
       console.warn(`[FFmpeg] Attempted to clean up non-existent file: ${filePath}`);
       return;
     }
 
-    // Delete the file using async fs.promises.unlink
-    await fs.promises.unlink(filePath);
+    // Delete the file using promisified fs.unlink
+    await fsUnlink(filePath);
     console.log(`[FFmpeg] Cleaned up temporary file: ${filePath}`);
   } catch (error: any) {
     console.warn(`[FFmpeg] Failed to clean up temporary file ${filePath}: ${error.message}`);
+    // Don't throw the error to avoid breaking the application flow
+    // The calling code should continue even if cleanup fails
   }
 }
 

@@ -24,8 +24,9 @@ export class VideoService {
    * @param fileName Original file name
    * @param fileSize File size in bytes
    * @param mimeType File MIME type
+   * @param language Optional language code (e.g., 'en', 'es')
    */
-  async initializeUpload(fileName: string, fileSize: number, mimeType: string): Promise<Video> {
+  async initializeUpload(fileName: string, fileSize: number, mimeType: string, language?: string): Promise<Video> { // Add language parameter
     try {
       // Validate file type
       if (!mimeType.startsWith('video/')) {
@@ -38,40 +39,71 @@ export class VideoService {
         throw new AppError(`File size exceeds the maximum limit of 4GB.`, 400);
       }
 
-      // Create a unique file ID for Appwrite storage
+      // Extract format from mimeType (e.g., "video/mp4" -> "mp4")
+      const format = mimeType.split('/')[1];
+      if (!format) {
+        console.warn(`Could not determine format from mimeType: ${mimeType}. Using 'unknown'.`);
+      }
+
+      // Create a unique ID for the video document itself
+      const videoId = ID.unique();
+      // Create a separate unique file ID for Appwrite storage
       const fileId = ID.unique();
 
-      // Create video entry in database with proper arguments (database ID, collection ID, document ID, data object)
+      // Create video entry in database with proper arguments
       const video = await databases.createDocument(
         DATABASE_ID,
         VIDEOS_COLLECTION_ID,
-        ID.unique(),
+        videoId, // Use the generated videoId as the document ID
         {
+          videoId: videoId, // Add the required videoId attribute
           name: fileName,
           fileSize,
           mimeType,
-          fileId,
+          format: format || 'unknown', // Store the video format as a string, not enum
+          language: language || 'unknown', // Add the language attribute, default to 'unknown'
+          fileId, // Keep the separate fileId for storage reference
           status: 'initialized'
         },
         createDocumentPermissions() // Use the permission helper function
       );
 
-      return {
-        id: video.$id,
+      // --- BEGIN ADDED LOGGING ---
+      console.log('Appwrite createDocument response:', JSON.stringify(video, null, 2));
+      if (!video || !video.$id) {
+        console.error('CRITICAL: Appwrite document created but $id is missing!', video);
+        throw new AppError('Failed to initialize upload: Appwrite returned invalid document structure.', 500);
+      }
+      // --- END ADDED LOGGING ---
+
+      const videoData: Video = { // Ensure type matches interface
+        id: video.$id, // Map Appwrite's $id to our 'id' (which is now videoId)
+        videoId: video.videoId, // Include videoId from the document data
         name: video.name,
         fileSize: video.fileSize,
         mimeType: video.mimeType,
+        format: video.format, // Include format from the document data
+        language: video.language, // Include language from the document data
         fileId: video.fileId,
         status: video.status,
         createdAt: new Date(video.$createdAt), // Use Appwrite's built-in system field
         updatedAt: new Date(video.$updatedAt)  // Use Appwrite's built-in system field
       };
+
+      // --- BEGIN ADDED LOGGING ---
+      console.log('Mapped Video object to return:', JSON.stringify(videoData, null, 2));
+      // --- END ADDED LOGGING ---
+
+      return videoData; // Return the mapped object
     } catch (error: any) {
       if (error instanceof AppError) {
         throw error;
       }
       console.error('Error initializing upload:', error);
-      throw new AppError(`Failed to initialize video upload: ${error.message || 'Unknown error'}`, 500);
+      // Add more specific error details if available
+      const message = error instanceof AppwriteException ? error.message : (error.message || 'Unknown error');
+      const code = error instanceof AppwriteException ? error.code : 500;
+      throw new AppError(`Failed to initialize video upload: ${message}`, code);
     }
   }
 
@@ -312,11 +344,14 @@ export class VideoService {
         id
       );
 
-      const videoData = {
+      const videoData: Video = { // Ensure type matches interface
         id: video.$id,
+        videoId: video.videoId, // Ensure videoId is mapped if it exists
         name: video.name,
         fileSize: video.fileSize,
         mimeType: video.mimeType,
+        format: video.format, // Ensure format is mapped
+        language: video.language, // Ensure language is mapped
         duration: video.duration,
         fileId: video.fileId,
         status: video.status,
@@ -358,11 +393,14 @@ export class VideoService {
         VIDEOS_COLLECTION_ID
       );
 
-      const videos = response.documents.map(doc => ({
+      const videos: Video[] = response.documents.map(doc => ({ // Ensure type matches interface
         id: doc.$id,
+        videoId: doc.videoId, // Ensure videoId is mapped if it exists
         name: doc.name,
         fileSize: doc.fileSize,
         mimeType: doc.mimeType,
+        format: doc.format, // Ensure format is mapped
+        language: doc.language, // Ensure language is mapped
         duration: doc.duration,
         fileId: doc.fileId,
         status: doc.status,

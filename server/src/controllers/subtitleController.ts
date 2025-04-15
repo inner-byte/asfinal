@@ -1,7 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
-import { ApiResponse, Subtitle } from '../types';
+import { ApiResponse, Subtitle, SubtitleGenerationStatus } from '../types';
 import { AppError } from '../middleware/errorHandler';
 import subtitleService from '../services/subtitleService'; // Import the singleton instance
+import backgroundJobService from '../services/backgroundJobService'; // Import the background job service
 
 // Note: Express body-parser limit is set in index.ts
 
@@ -15,7 +16,7 @@ export class SubtitleController {
   generateSubtitles = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { videoId } = req.params;
-      const { language = 'en' } = req.body;
+      const { language = 'en', useBackgroundJob = true } = req.body;
 
       if (!videoId) {
         throw new AppError('Video ID is required', 400);
@@ -28,17 +29,35 @@ export class SubtitleController {
 
       console.log(`[SubtitleController] Initiating subtitle generation for video ${videoId} in language ${language}`);
 
-      // Use the subtitle service to generate subtitles
-      const subtitle = await subtitleService.generateSubtitles(videoId, language);
+      // Check if we should use background processing or synchronous processing
+      if (useBackgroundJob) {
+        // Create a pending subtitle document
+        const documentId = await subtitleService.createPendingSubtitleDocument(videoId, language);
 
-      // Construct detailed response
-      const response: ApiResponse<Subtitle> = {
-        status: 'success',
-        data: subtitle,
-        message: 'Subtitle generation completed successfully'
-      };
+        // Add the job to the queue
+        const jobId = await backgroundJobService.addSubtitleGenerationJob(videoId, language, documentId);
 
-      res.status(201).json(response);
+        // Return a 202 Accepted response with the job ID and document ID
+        const response: ApiResponse<{ jobId: string, subtitleId: string }> = {
+          status: 'success',
+          data: { jobId, subtitleId: documentId },
+          message: 'Subtitle generation job queued successfully. Check job status for updates.'
+        };
+
+        res.status(202).json(response);
+      } else {
+        // Use the subtitle service to generate subtitles synchronously (legacy mode)
+        const subtitle = await subtitleService.generateSubtitles(videoId, language);
+
+        // Construct detailed response
+        const response: ApiResponse<Subtitle> = {
+          status: 'success',
+          data: subtitle,
+          message: 'Subtitle generation completed successfully'
+        };
+
+        res.status(201).json(response);
+      }
     } catch (error: any) {
       // Handle specific error cases
       if (error instanceof AppError) {
@@ -175,7 +194,38 @@ export class SubtitleController {
       next(error);
     }
   };
+
+  /**
+   * Get the status of a subtitle generation job
+   */
+  getJobStatus = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { jobId } = req.params;
+
+      if (!jobId) {
+        throw new AppError('Job ID is required', 400);
+      }
+
+      // Get the job status from the background job service
+      const jobStatus = await backgroundJobService.getJobStatus(jobId);
+
+      // Construct response
+      const response: ApiResponse<typeof jobStatus> = {
+        status: 'success',
+        data: jobStatus,
+        message: `Job status retrieved successfully: ${jobStatus.status}`
+      };
+
+      res.status(200).json(response);
+    } catch (error: any) {
+      if (error instanceof AppError && error.statusCode === 404) {
+        return next(new AppError('Job not found with the provided ID', 404));
+      }
+      next(error);
+    }
+  };
 }
+
 
 // Export singleton instance and individual methods for direct imports
 const subtitleController = new SubtitleController();
@@ -185,7 +235,8 @@ export const {
   getSubtitlesByVideoId,
   getSubtitleById,
   getSubtitleContent,
-  deleteSubtitle
+  deleteSubtitle,
+  getJobStatus
 } = subtitleController;
 
 export default subtitleController;

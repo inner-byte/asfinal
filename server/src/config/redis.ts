@@ -27,15 +27,17 @@ const redisOptions = {
   },
   enableOfflineQueue: true,
   connectTimeout: 10000, // 10 seconds
-  lazyConnect: true, // Don't connect immediately
+  lazyConnect: false, // Connect immediately
 };
 
 // Create Redis client instance
 let redisClient: IORedis;
 
 try {
+  // Create Redis client with the configured options
   redisClient = new IORedis(redisOptions);
 
+  // Set up event listeners
   redisClient.on('connect', () => {
     console.log('Connected to Redis server');
   });
@@ -61,14 +63,18 @@ try {
     console.log('Redis connection ended');
   });
 
-  // Connect to Redis
-  redisClient.connect().catch(err => {
-    console.error('Failed to connect to Redis:', err);
-  });
+  // Explicitly connect to Redis if not using lazyConnect
+  if (!redisOptions.lazyConnect) {
+    console.log('Attempting to connect to Redis...');
+    redisClient.connect().catch(err => {
+      console.error('Failed to connect to Redis:', err);
+    });
+  }
 } catch (error) {
   console.error('Error creating Redis client:', error);
   // Create a dummy client that doesn't actually connect to Redis
   // This allows the application to start even if Redis is not available
+  console.warn('Creating fallback Redis client - caching will be disabled');
   redisClient = new IORedis(null as any);
 }
 

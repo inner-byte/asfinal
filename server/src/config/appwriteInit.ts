@@ -135,6 +135,30 @@ async function ensureVideosAttributes(): Promise<void> {
       console.log('Created duration attribute for Videos collection');
     }
 
+    // Create format attribute if it doesn't exist
+    if (!existingAttributes.includes('format')) {
+      await databases.createStringAttribute(
+        DATABASE_ID,
+        VIDEOS_COLLECTION_ID,
+        'format',
+        50,  // Allow for various video format strings
+        false  // not required
+      );
+      console.log('Created format attribute for Videos collection');
+    }
+
+    // Create language attribute if it doesn't exist
+    if (!existingAttributes.includes('language')) {
+      await databases.createStringAttribute(
+        DATABASE_ID,
+        VIDEOS_COLLECTION_ID,
+        'language',
+        10,  // Language code length
+        false  // not required
+      );
+      console.log('Created language attribute for Videos collection');
+    }
+
   } catch (error) {
     console.error('Error ensuring Videos attributes:', error);
   }
@@ -161,6 +185,18 @@ async function ensureSubtitlesAttributes(): Promise<void> {
       console.log('Created videoId attribute for Subtitles collection');
     }
 
+    // Create name attribute if it doesn't exist
+    if (!existingAttributes.includes('name')) {
+      await databases.createStringAttribute(
+        DATABASE_ID,
+        SUBTITLES_COLLECTION_ID,
+        'name',
+        255,
+        true  // required
+      );
+      console.log('Created name attribute for Subtitles collection');
+    }
+
     // Create format attribute if it doesn't exist
     if (!existingAttributes.includes('format')) {
       await databases.createEnumAttribute(
@@ -183,6 +219,29 @@ async function ensureSubtitlesAttributes(): Promise<void> {
         true  // required
       );
       console.log('Created fileId attribute for Subtitles collection');
+    }
+
+    // Create fileSize attribute if it doesn't exist
+    if (!existingAttributes.includes('fileSize')) {
+      await databases.createIntegerAttribute(
+        DATABASE_ID,
+        SUBTITLES_COLLECTION_ID,
+        'fileSize',
+        true  // required
+      );
+      console.log('Created fileSize attribute for Subtitles collection');
+    }
+
+    // Create mimeType attribute if it doesn't exist
+    if (!existingAttributes.includes('mimeType')) {
+      await databases.createStringAttribute(
+        DATABASE_ID,
+        SUBTITLES_COLLECTION_ID,
+        'mimeType',
+        100,
+        true  // required
+      );
+      console.log('Created mimeType attribute for Subtitles collection');
     }
 
     // Create language attribute if it doesn't exist

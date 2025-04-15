@@ -12,15 +12,17 @@ export class VideoController {
    */
   initializeUpload = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const { fileName, fileSize, mimeType } = req.body;
+      // Extract language from body as well
+      const { fileName, fileSize, mimeType, language } = req.body;
 
       // Validate request body
       if (!fileName || !fileSize || !mimeType) {
+        // Keep language optional for now, service provides default
         throw new AppError('Missing required fields: fileName, fileSize, or mimeType', 400);
       }
 
-      // Use the singleton instance
-      const video = await videoService.initializeUpload(fileName, fileSize, mimeType);
+      // Use the singleton instance, passing language
+      const video = await videoService.initializeUpload(fileName, fileSize, mimeType, language);
 
       const response: ApiResponse<Video> = {
         status: 'success',
@@ -28,8 +30,18 @@ export class VideoController {
         message: 'Upload initialized successfully'
       };
 
+      // --- BEGIN ADDED LOGGING ---
+      console.log('Sending response for initializeUpload:', JSON.stringify(response, null, 2));
+      if (!response.data || !response.data.id) {
+          console.error("CRITICAL: Controller is about to send response missing data.id!", response);
+      }
+      // --- END ADDED LOGGING ---
+
       res.status(201).json(response);
     } catch (error) {
+      // --- BEGIN ADDED LOGGING ---
+      console.error("Error caught in initializeUpload controller:", error);
+      // --- END ADDED LOGGING ---
       next(error);
     }
   };

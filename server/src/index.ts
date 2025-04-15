@@ -5,6 +5,7 @@ import routes from './routes';
 import { errorHandler } from './middleware/errorHandler';
 import { initializeAppwrite } from './config/appwriteInit';
 import { redisClient } from './config/redis';
+import backgroundJobService from './services/backgroundJobService';
 
 // Load environment variables
 dotenv.config();
@@ -41,7 +42,8 @@ app.get('/', (_req: Request, res: Response) => {
       health: '/health',
       api: '/api',
       videos: '/api/videos',
-      subtitles: '/api/subtitles'
+      subtitles: '/api/subtitles',
+      jobs: '/api/jobs'
     }
   });
 });
@@ -63,15 +65,57 @@ app.use(errorHandler);
 // Initialize Appwrite resources and start server
 (async () => {
   try {
+    // Initialize Redis connection
+    console.log('Checking Redis connection...');
+    if (redisClient.status !== 'ready') {
+      console.log('Redis not ready, attempting to connect...');
+      try {
+        await redisClient.connect();
+        console.log('Redis connection established successfully');
+      } catch (redisError) {
+        console.error('Failed to connect to Redis:', redisError);
+        console.warn('Continuing without Redis - caching will be disabled');
+      }
+    } else {
+      console.log('Redis already connected');
+    }
+
     console.log('Initializing Appwrite resources...');
     await initializeAppwrite();
     console.log('Appwrite resources initialized successfully');
 
     // Start server after Appwrite initialization
-    app.listen(port, () => {
+    const server = app.listen(port, () => {
       console.log(`⚡️[server]: Server is running at http://localhost:${port}`);
       console.log(`API endpoints available at http://localhost:${port}/api`);
       console.log(`Health check available at http://localhost:${port}/health`);
+    });
+
+    // Graceful shutdown
+    process.on('SIGTERM', async () => {
+      console.log('SIGTERM signal received: closing HTTP server and background jobs');
+
+      // Shutdown background job service
+      await backgroundJobService.shutdown();
+
+      // Close HTTP server
+      server.close(() => {
+        console.log('HTTP server closed');
+        process.exit(0);
+      });
+    });
+
+    process.on('SIGINT', async () => {
+      console.log('SIGINT signal received: closing HTTP server and background jobs');
+
+      // Shutdown background job service
+      await backgroundJobService.shutdown();
+
+      // Close HTTP server
+      server.close(() => {
+        console.log('HTTP server closed');
+        process.exit(0);
+      });
     });
   } catch (error) {
     console.error('Failed to initialize Appwrite resources:', error);
@@ -80,10 +124,37 @@ app.use(errorHandler);
     // This allows the server to start even if Appwrite initialization fails
     // The server will still be able to handle requests that don't require Appwrite
     console.warn('Starting server despite Appwrite initialization failure');
-    app.listen(port, () => {
+    const server = app.listen(port, () => {
       console.log(`⚡️[server]: Server is running at http://localhost:${port} (LIMITED FUNCTIONALITY)`);
       console.log(`API endpoints available at http://localhost:${port}/api`);
       console.log(`Health check available at http://localhost:${port}/health`);
+    });
+
+    // Graceful shutdown even in limited functionality mode
+    process.on('SIGTERM', async () => {
+      console.log('SIGTERM signal received: closing HTTP server and background jobs');
+
+      // Shutdown background job service
+      await backgroundJobService.shutdown();
+
+      // Close HTTP server
+      server.close(() => {
+        console.log('HTTP server closed');
+        process.exit(0);
+      });
+    });
+
+    process.on('SIGINT', async () => {
+      console.log('SIGINT signal received: closing HTTP server and background jobs');
+
+      // Shutdown background job service
+      await backgroundJobService.shutdown();
+
+      // Close HTTP server
+      server.close(() => {
+        console.log('HTTP server closed');
+        process.exit(0);
+      });
     });
   }
 })();

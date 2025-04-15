@@ -3,6 +3,16 @@ import { getGeminiModel } from '../config/vertex'; // Import the getter function
 import { AppError } from '../middleware/errorHandler';
 // Import the necessary types from the Vertex AI SDK
 import { FileDataPart } from '@google-cloud/vertexai/build/src/types/content';
+import AUDIO_PROCESSING from '../config/audioProcessing';
+
+// Centralized retry configuration
+const RETRY_CONFIG = {
+    retries: 7,
+    minTimeout: 3000,
+    maxTimeout: 60000,
+    factor: 2,
+    randomize: true,
+};
 
 /**
  * Generates a transcription from an audio file stored in GCS using the Gemini API.
@@ -100,13 +110,9 @@ export async function generateTranscriptionViaGemini(gcsUri: string, language: s
                 }
             },
             {
-                retries: 7,
-                minTimeout: 3000,
-                maxTimeout: 60000,
-                factor: 2,
-                randomize: true,
+                ...RETRY_CONFIG,
                 onRetry: (error: any, attempt) => {
-                    console.warn(`[GeminiUtils] Retrying Gemini API call (${attempt}/7) due to: ${error.message || 'Unknown error'}`);
+                    console.warn(`[GeminiUtils] Retrying Gemini API call (${attempt}/${RETRY_CONFIG.retries}) due to: ${error.message || 'Unknown error'}`);
                 }
             }
         );

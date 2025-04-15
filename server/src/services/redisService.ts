@@ -4,7 +4,8 @@ import {
   deleteCacheValue,
   deleteCachePattern,
   generateVideoKey,
-  generateSubtitleKey
+  generateSubtitleKey,
+  redisClient
 } from '../config/redis'; // Functions now directly use Redis
 import { Video } from '../types';
 
@@ -104,6 +105,36 @@ export class RedisService {
   async deleteAllCachedSubtitles(): Promise<void> {
     // Directly calls the simplified deleteCachePattern which uses Redis
     await deleteCachePattern('subtitle:*');
+  }
+
+  /**
+   * Check if Redis is connected and ready
+   * @returns True if Redis is connected and ready, false otherwise
+   */
+  async isConnected(): Promise<boolean> {
+    try {
+      return redisClient.status === 'ready';
+    } catch (error) {
+      console.error('Error checking Redis connection status:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Connect to Redis if not already connected
+   * @returns True if connection was successful, false otherwise
+   */
+  async connect(): Promise<boolean> {
+    try {
+      if (redisClient.status !== 'ready') {
+        await redisClient.connect();
+        return redisClient.status === 'ready';
+      }
+      return true; // Already connected
+    } catch (error) {
+      console.error('Error connecting to Redis:', error);
+      return false;
+    }
   }
 }
 

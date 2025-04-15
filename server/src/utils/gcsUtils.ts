@@ -1,6 +1,8 @@
 import { Storage } from '@google-cloud/storage';
 import path from 'path';
 import fs from 'fs';
+import retry from 'async-retry';
+import { AppError } from '../middleware/errorHandler';
 
 // Initialize GCS Storage client
 // The client will use credentials from GOOGLE_APPLICATION_CREDENTIALS environment variable
@@ -9,13 +11,27 @@ const storage = new Storage();
 // Get bucket name from environment variables
 const BUCKET_NAME = process.env.BACKEND_GCS_BUCKET_NAME || '';
 
+// Retry configuration for GCS operations
+const GCS_RETRY_CONFIG = {
+  retries: 5,
+  minTimeout: 1000,
+  maxTimeout: 10000,
+  factor: 2,
+  randomize: true,
+};
+
 /**
  * Validates GCS configuration
  * @returns boolean indicating if the GCS configuration is valid
+ * @throws AppError if the configuration is invalid and throwError is true
  */
-export function validateGcsConfig(): boolean {
+export function validateGcsConfig(throwError: boolean = false): boolean {
   if (!BUCKET_NAME) {
-    console.error('[GCS] Error: BACKEND_GCS_BUCKET_NAME environment variable is not set.');
+    const errorMsg = '[GCS] Error: BACKEND_GCS_BUCKET_NAME environment variable is not set.';
+    console.error(errorMsg);
+    if (throwError) {
+      throw new AppError(errorMsg, 500);
+    }
     return false;
   }
 
@@ -94,15 +110,37 @@ export async function uploadToGcs(
       }
     }
 
-    // Perform the upload
-    await storage.bucket(BUCKET_NAME).upload(localPath, uploadOptions);
+    // Perform the upload with retry logic
+    await retry(
+      async (bail) => {
+        try {
+          await storage.bucket(BUCKET_NAME).upload(localPath, uploadOptions);
+        } catch (error: any) {
+          // Don't retry client errors (4xx)
+          if (error.code >= 400 && error.code < 500) {
+            console.error(`[GCS] Client error (${error.code}): ${error.message}`);
+            bail(error);
+            return;
+          }
+          // Log and retry server errors (5xx) or network issues
+          console.warn(`[GCS] Retryable error: ${error.message}`);
+          throw error; // Throw to trigger retry
+        }
+      },
+      {
+        ...GCS_RETRY_CONFIG,
+        onRetry: (error, attempt) => {
+          console.warn(`[GCS] Retry attempt ${attempt}/${GCS_RETRY_CONFIG.retries} for upload to ${effectiveDestination}: ${error.message}`);
+        }
+      }
+    );
 
     const gcsUri = `gs://${BUCKET_NAME}/${effectiveDestination}`;
     console.log(`[GCS] File uploaded successfully to ${gcsUri}`);
     return gcsUri;
   } catch (error: any) {
     console.error(`[GCS] Upload Error: Failed to upload ${localPath} to ${BUCKET_NAME}.`, error);
-    throw new Error(`[GCS] Upload failed: ${error.message}`);
+    throw new AppError(`Upload to Google Cloud Storage failed: ${error.message}`, 500);
   }
 }
 
@@ -119,7 +157,30 @@ export async function deleteFromGcs(fileName: string): Promise<void> {
 
   try {
     console.log(`[GCS] Deleting gs://${BUCKET_NAME}/${fileName}...`);
-    await storage.bucket(BUCKET_NAME).file(fileName).delete();
+
+    // Add retry logic for deletion
+    await retry(
+      async () => {
+        try {
+          await storage.bucket(BUCKET_NAME).file(fileName).delete();
+        } catch (error: any) {
+          // If file doesn't exist, consider it a success (idempotent delete)
+          if (error.code === 404) {
+            console.log(`[GCS] File ${fileName} already deleted or doesn't exist.`);
+            return;
+          }
+          throw error; // Retry other errors
+        }
+      },
+      {
+        ...GCS_RETRY_CONFIG,
+        retries: 3, // Fewer retries for deletion
+        onRetry: (error, attempt) => {
+          console.warn(`[GCS] Retry attempt ${attempt}/3 for deletion of ${fileName}: ${error.message}`);
+        }
+      }
+    );
+
     console.log(`[GCS] File ${fileName} deleted successfully from GCS.`);
   } catch (error: any) {
     // Log error but don't necessarily throw, cleanup failure might not be critical
@@ -139,11 +200,30 @@ export async function fileExistsInGcs(fileName: string): Promise<boolean> {
   }
 
   try {
-    const [exists] = await storage.bucket(BUCKET_NAME).file(fileName).exists();
+    // Add retry logic for checking file existence
+    const exists = await retry(
+      async () => {
+        try {
+          const [exists] = await storage.bucket(BUCKET_NAME).file(fileName).exists();
+          return exists;
+        } catch (error: any) {
+          console.warn(`[GCS] Error checking if file ${fileName} exists: ${error.message}`);
+          throw error; // Retry on error
+        }
+      },
+      {
+        ...GCS_RETRY_CONFIG,
+        retries: 3, // Fewer retries for existence check
+        onRetry: (error, attempt) => {
+          console.warn(`[GCS] Retry attempt ${attempt}/3 for checking existence of ${fileName}: ${error.message}`);
+        }
+      }
+    );
+
     return exists;
   } catch (error: any) {
     console.error(`[GCS] Error checking if file ${fileName} exists:`, error);
-    throw new Error(`[GCS] Failed to check if file exists: ${error.message}`);
+    throw new AppError(`Failed to check if file exists in Google Cloud Storage: ${error.message}`, 500);
   }
 }
 
@@ -165,11 +245,30 @@ export async function getSignedUrl(fileName: string, expirationMinutes = 60): Pr
       expires: Date.now() + expirationMinutes * 60 * 1000,
     };
 
-    const [url] = await storage.bucket(BUCKET_NAME).file(fileName).getSignedUrl(options);
+    // Add retry logic for generating signed URL
+    const url = await retry(
+      async () => {
+        try {
+          const [url] = await storage.bucket(BUCKET_NAME).file(fileName).getSignedUrl(options);
+          return url;
+        } catch (error: any) {
+          console.warn(`[GCS] Error generating signed URL for ${fileName}: ${error.message}`);
+          throw error; // Retry on error
+        }
+      },
+      {
+        ...GCS_RETRY_CONFIG,
+        retries: 3, // Fewer retries for URL generation
+        onRetry: (error, attempt) => {
+          console.warn(`[GCS] Retry attempt ${attempt}/3 for generating signed URL for ${fileName}: ${error.message}`);
+        }
+      }
+    );
+
     return url;
   } catch (error: any) {
     console.error(`[GCS] Error generating signed URL for ${fileName}:`, error);
-    throw new Error(`[GCS] Failed to generate signed URL: ${error.message}`);
+    throw new AppError(`Failed to generate signed URL from Google Cloud Storage: ${error.message}`, 500);
   }
 }
 
