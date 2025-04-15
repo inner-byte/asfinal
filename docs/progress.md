@@ -6,7 +6,7 @@ This document tracks the development progress, challenges encountered, solutions
 
 | Phase | Description | Status | Completion % |
 |-------|-------------|--------|-------------|
-| 1 | Project Setup and Initial Development | In Progress | 75% |
+| 1 | Project Setup and Initial Development | In Progress | 90% |
 | 2 | Real-time Subtitle Preview and Synchronization | Not Started | 0% |
 | 3 | Subtitle Export and Format Conversion | Not Started | 0% |
 | 4 | UI/UX Enhancement and Optimization | Not Started | 0% |
@@ -22,7 +22,7 @@ This document tracks the development progress, challenges encountered, solutions
 |-----------|-------------|--------|-------------|
 | M1.1 | Set up the development environment | Completed | 100% |
 | M1.2 | Implement video upload functionality | Completed | 100% |
-| M1.3 | Integrate Gemini-flash-2.0 model | Pending | 0% |
+| M1.3 | Integrate Gemini-flash-2.0 model | Completed | 100% |
 | M1.4 | Develop initial frontend interface | In Progress | 70% |
 
 ### Recently Completed Tasks
@@ -62,20 +62,22 @@ This document tracks the development progress, challenges encountered, solutions
   - Implemented a reusable StepNavigation component for consistent user flow
   - Connected components to navigation system for state management
   - Added proper page transitions and navigation controls
-- *Initial research on Gemini-flash-2.0 integration via Vertex API completed.*
+- Completed Gemini-flash-2.0 integration via Vertex API:
+  - Configured Vertex API client for Gemini-flash-2.0 model
+  - Implemented audio extraction utility using fluent-ffmpeg
+  - Implemented GCS upload/delete utilities for intermediate audio
+  - Updated subtitleService.ts to orchestrate the full pipeline
+  - Added comprehensive error handling throughout the pipeline
+  - Fixed issue with Appwrite URL handling for video downloads
 
 ### In-Progress Tasks
 - Integrate Plyr video player with basic subtitle support (`components/SubtitlePreview/PlyrPlayer.tsx`)
 - Develop initial frontend interface components (`SubtitlePreview.tsx`, `ExportOptions.tsx`)
 
 ### Upcoming Tasks
-1.  **Implement Refined Gemini Integration Pipeline (M1.3):**
-    *   **Note:** The detailed plan for these tasks is documented in `#file:gemini_transcription_implementation.md`.
-    *   Implement `ffmpegUtils.ts` and `gcsUtils.ts`.
-    *   Update `subtitleService.ts` and `subtitleController.ts`.
-    *   Add necessary configurations and error handling.
-2.  Complete Plyr integration and connect VTT fetching on the frontend preview page.
-3.  Begin Phase 2: Implement `useSubtitleSync` hook and research FFmpeg timestamp correction methods.
+1.  Complete Plyr integration and connect VTT fetching on the frontend preview page.
+2.  Begin Phase 2: Implement `useSubtitleSync` hook and research FFmpeg timestamp correction methods.
+3.  Implement subtitle preview and synchronization features.
 
 ### Challenges and Solutions
 
@@ -87,7 +89,8 @@ This document tracks the development progress, challenges encountered, solutions
 | April 12, 2025 | Handling large video file uploads (up to 4GB) efficiently | Implemented streaming approach for initial upload to Appwrite. *Further streaming needed for processing pipeline.* | Resolved (Initial Upload) |
 | April 12, 2025 | Creating UI components that match the "lipsync-2" design reference | Implemented a modern UI with dark theme, gradient accents, and subtle animations following the design system | Resolved |
 | April 12, 2025 | TypeScript error in components index.ts | Fixed UI/index.ts to properly export a type and constant to make it a valid module | Resolved |
-| April 13, 2025 | Gemini API limitations for large audio files | **Planned Solution:** Adopt intermediate GCS storage approach: Upload extracted audio to a backend-managed GCS bucket and pass the `gs://` URI to Gemini. Add cleanup steps. | Pending Implementation |
+| April 13, 2025 | Gemini API limitations for large audio files | Adopted intermediate GCS storage approach: Upload extracted audio to a backend-managed GCS bucket and pass the `gs://` URI to Gemini. Added cleanup steps. | Resolved |
+| April 15, 2025 | Appwrite SDK returning ArrayBuffer instead of URL string | Fixed by constructing direct URLs to Appwrite storage instead of using `storage.getFileDownload()` which was returning an object that couldn't be properly converted to a URL string. | Resolved |
 
 ### Implementation Notes
 
@@ -120,20 +123,31 @@ This document tracks the development progress, challenges encountered, solutions
 - Created modern UI following the "lipsync-2" design with custom animations and gradient elements.
 - Used Inter and Poppins fonts as specified in the project goals.
 - Organized components using feature-based architecture for better maintainability.
-- **Planned Pipeline:** Appwrite Stream -> `fluent-ffmpeg` -> Temp Local Audio -> Backend GCS -> Gemini API -> Appwrite VTT Storage -> Appwrite DB.
-- **Planned:** Use `async-retry` for reliable Gemini API calls.
-- **Planned:** Implement robust VTT formatting.
+- **Implemented Pipeline:** Appwrite Stream -> `fluent-ffmpeg` -> Temp Local Audio -> Backend GCS -> Gemini API -> Appwrite VTT Storage -> Appwrite DB.
+- Used `async-retry` for reliable Gemini API calls.
+- Implemented robust VTT formatting.
 - **Planned (Phase 5):** Implement Redis/BullMQ for background job queue management for long-running tasks like subtitle generation.
 
 ### Next Steps
-1.  **Implement Refined Gemini Integration Pipeline (M1.3):** Focus on implementing the steps outlined in `#file:gemini_transcription_implementation.md` and reflected in the updated `#file:tasks.md`.
-2.  Complete the frontend integration for the subtitle preview page (Plyr player, fetching data).
-3.  Begin Phase 2 tasks once M1.3 and M1.4 are complete.
+1.  Complete the frontend integration for the subtitle preview page (Plyr player, fetching data).
+2.  Begin Phase 2 tasks once M1.4 is complete.
+3.  Implement subtitle preview and synchronization features.
 
 ### Blockers
-- None at this time - Ready to implement the Gemini transcription pipeline.
+- None at this time - Ready to complete the frontend integration and move to Phase 2.
 
 ## Development Log
+
+### [DATE: April 15, 2025]
+
+#### Summary
+Fixed critical issue with Appwrite URL handling for video downloads. The Appwrite SDK's `storage.getFileDownload()` function was returning an object (likely an ArrayBuffer) instead of a URL string, causing the subtitle generation pipeline to fail.
+
+#### Details
+- Fixed `getVideoDownloadUrl` in `videoService.ts` to construct the URL directly using the Appwrite endpoint and file ID instead of using `storage.getFileDownload()`.
+- Updated `getVideoStream` in `videoService.ts` to use the same approach for consistency.
+- Modified `prepareVideoForProcessing` in `videoProcessingUtils.ts` to correctly handle the URL format.
+- Updated documentation (`tasks.md`, `progress.md`) to mark the Gemini integration tasks as completed.
 
 ### [DATE: April 13, 2025]
 

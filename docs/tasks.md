@@ -43,22 +43,22 @@ This document outlines all tasks for the AI-powered subtitle generator web appli
 
 ### Gemini Integration (Refined Pipeline - Next Steps)
 - **Note:** Refer to `#file:gemini_transcription_implementation.md` for detailed steps and context for this section.
-- ⏳ Configure Vertex API client for Gemini-flash-2.0 model (`config/vertex.ts`)
-- ⏳ Implement audio extraction utility using `fluent-ffmpeg` (`utils/ffmpegUtils.ts`)
-- ⏳ Implement GCS upload/delete utilities for intermediate audio (`utils/gcsUtils.ts`)
-- ⏳ Update `subtitleService.ts` to orchestrate the full pipeline:
-    - ⏳ Fetch video stream from Appwrite
-    - ⏳ Call `extractAudioToTempFile`
-    - ⏳ Call `uploadToGcs`
-    - ⏳ Call Gemini API (`transcribeAudioWithGemini`) with GCS URI and retry logic (`async-retry`)
-    - ⏳ Implement robust VTT formatting (`formatRawTranscriptionToVTT`)
-    - ⏳ Store VTT in Appwrite Storage (`subtitles_bucket`)
-    - ⏳ Update Appwrite Database (`subtitles` collection) with VTT fileId and video status
-    - ⏳ Implement cleanup logic (`cleanupTempFile`, `deleteFromGcs`) in `finally` block
-- ⏳ Update `subtitleController.ts` to call the refined `generateSubtitles` service method
-- ⏳ Add API endpoints for getting subtitle metadata (`GET /api/videos/:videoId/subtitles`) and content (`GET /api/subtitles/:fileId/content`)
-- ⏳ Add comprehensive error handling throughout the pipeline
-- ⏳ Add necessary environment variables (e.g., `BACKEND_GCS_BUCKET_NAME`)
+- ✅ Configure Vertex API client for Gemini-flash-2.0 model (`config/vertex.ts`)
+- ✅ Implement audio extraction utility using `fluent-ffmpeg` (`utils/ffmpegUtils.ts`)
+- ✅ Implement GCS upload/delete utilities for intermediate audio (`utils/gcsUtils.ts`)
+- ✅ Update `subtitleService.ts` to orchestrate the full pipeline:
+    - ✅ Fetch video stream from Appwrite
+    - ✅ Call `extractAudioToTempFile`
+    - ✅ Call `uploadToGcs`
+    - ✅ Call Gemini API (`transcribeAudioWithGemini`) with GCS URI and retry logic (`async-retry`)
+    - ✅ Implement robust VTT formatting (`formatRawTranscriptionToVTT`)
+    - ✅ Store VTT in Appwrite Storage (`subtitles_bucket`)
+    - ✅ Update Appwrite Database (`subtitles` collection) with VTT fileId and video status
+    - ✅ Implement cleanup logic (`cleanupTempFile`, `deleteFromGcs`) in `finally` block
+- ✅ Update `subtitleController.ts` to call the refined `generateSubtitles` service method
+- ✅ Add API endpoints for getting subtitle metadata (`GET /api/videos/:videoId/subtitles`) and content (`GET /api/subtitles/:fileId/content`)
+- ✅ Add comprehensive error handling throughout the pipeline
+- ✅ Add necessary environment variables (e.g., `BACKEND_GCS_BUCKET_NAME`)
 
 ### Video Player Integration
 - ⏳ Integrate Plyr video player with basic subtitle support (`components/SubtitlePreview/PlyrPlayer.tsx`)
