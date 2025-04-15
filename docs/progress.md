@@ -71,7 +71,7 @@ This document tracks the development progress, challenges encountered, solutions
   - Fixed issue with Appwrite URL handling for video downloads
 
 ### In-Progress Tasks
-- Integrate Plyr video player with basic subtitle support (`components/SubtitlePreview/PlyrPlayer.tsx`)
+- Integrate Plyr video player with basic subtitle support (`components/SubtitlePreview/PlyrPlayer.tsx`) - See `docs/player_implementation.md` for detailed implementation guide
 - Develop initial frontend interface components (`SubtitlePreview.tsx`, `ExportOptions.tsx`)
 
 ### Upcoming Tasks
@@ -129,7 +129,7 @@ This document tracks the development progress, challenges encountered, solutions
 - **Planned (Phase 5):** Implement Redis/BullMQ for background job queue management for long-running tasks like subtitle generation.
 
 ### Next Steps
-1.  Complete the frontend integration for the subtitle preview page (Plyr player, fetching data).
+1.  Complete the frontend integration for the subtitle preview page (Plyr player, fetching data) following the implementation guide in `docs/player_implementation.md`.
 2.  Begin Phase 2 tasks once M1.4 is complete.
 3.  Implement subtitle preview and synchronization features.
 

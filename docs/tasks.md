@@ -61,6 +61,7 @@ This document outlines all tasks for the AI-powered subtitle generator web appli
 - ✅ Add necessary environment variables (e.g., `BACKEND_GCS_BUCKET_NAME`)
 
 ### Video Player Integration
+- **Note:** Refer to `docs/player_implementation.md` for detailed implementation guide for Plyr integration.
 - ⏳ Integrate Plyr video player with basic subtitle support (`components/SubtitlePreview/PlyrPlayer.tsx`)
 - ⏳ Implement video playback component with subtitle display (Connect VTT content fetch)
 - ⏳ Create initial UI for video player controls
