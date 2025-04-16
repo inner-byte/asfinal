@@ -135,19 +135,19 @@ async function ensureVideosAttributes(): Promise<void> {
       console.log('Created duration attribute for Videos collection');
     }
 
-    // Create format attribute if it doesn't exist
-    if (!existingAttributes.includes('format')) {
+    // Create videoFormat attribute if it doesn't exist (optional String)
+    if (!existingAttributes.includes('videoFormat')) {
       await databases.createStringAttribute(
         DATABASE_ID,
         VIDEOS_COLLECTION_ID,
-        'format',
+        'videoFormat', // Correct attribute name
         50,  // Allow for various video format strings
         false  // not required
       );
-      console.log('Created format attribute for Videos collection');
+      console.log('Created videoFormat attribute for Videos collection');
     }
 
-    // Create language attribute if it doesn't exist
+    // Create language attribute if it doesn't exist (optional String)
     if (!existingAttributes.includes('language')) {
       await databases.createStringAttribute(
         DATABASE_ID,
@@ -158,6 +158,20 @@ async function ensureVideosAttributes(): Promise<void> {
       );
       console.log('Created language attribute for Videos collection');
     }
+
+    // Create videoId attribute if it doesn't exist (required String)
+    // This was missing and is required by the Video type/interface
+    if (!existingAttributes.includes('videoId')) {
+        await databases.createStringAttribute(
+            DATABASE_ID,
+            VIDEOS_COLLECTION_ID,
+            'videoId',
+            36, // Assuming same length as fileId/documentId
+            true // required
+        );
+        console.log('Created videoId attribute for Videos collection');
+    }
+
 
   } catch (error) {
     console.error('Error ensuring Videos attributes:', error);

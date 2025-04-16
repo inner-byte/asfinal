@@ -61,7 +61,7 @@ export class VideoService {
           name: fileName,
           fileSize,
           mimeType,
-          format: format || 'unknown', // Store the video format as a string, not enum
+          videoFormat: format || 'unknown', // Use videoFormat to store the video format string
           language: language || 'unknown', // Add the language attribute, default to 'unknown'
           fileId, // Keep the separate fileId for storage reference
           status: 'initialized'
@@ -83,7 +83,7 @@ export class VideoService {
         name: video.name,
         fileSize: video.fileSize,
         mimeType: video.mimeType,
-        format: video.format, // Include format from the document data
+        videoFormat: video.videoFormat, // Use videoFormat from the document data
         language: video.language, // Include language from the document data
         fileId: video.fileId,
         status: video.status,
@@ -415,7 +415,7 @@ export class VideoService {
         name: video.name,
         fileSize: video.fileSize,
         mimeType: video.mimeType,
-        format: video.format, // Ensure format is mapped
+        videoFormat: video.videoFormat, // Ensure videoFormat is mapped
         language: video.language, // Ensure language is mapped
         duration: video.duration,
         fileId: video.fileId,
@@ -464,7 +464,7 @@ export class VideoService {
         name: doc.name,
         fileSize: doc.fileSize,
         mimeType: doc.mimeType,
-        format: doc.format, // Ensure format is mapped
+        videoFormat: doc.videoFormat, // Ensure videoFormat is mapped
         language: doc.language, // Ensure language is mapped
         duration: doc.duration,
         fileId: doc.fileId,

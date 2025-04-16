@@ -7,7 +7,7 @@ export interface Video {
   name: string;
   fileSize: number;
   mimeType: string;
-  format?: string; // Added in previous step, ensure it's here
+  videoFormat?: string; // Renamed from 'format' to match actual schema attribute
   language?: string; // Add language field
   duration?: number;
   fileId: string;
