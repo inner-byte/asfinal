@@ -4,7 +4,10 @@ import fs from 'fs';
 import { Readable } from 'stream';
 import { Job } from 'bullmq';
 import { validateSubtitleDocument } from '../utils/validationUtils';
-import videoService from './videoService';
+import videoService from './videoService'; // Keep for video info if needed
+import redisService, { CacheUnavailableError, CacheOperationError } from './redisService'; // Import redis service and errors
+import { redisClient } from '../config/redis'; // Import redisClient for locking
+import { AppwriteException } from 'node-appwrite'; // Import AppwriteException
 
 // Import configurations
 import {
@@ -36,11 +39,42 @@ import { Subtitle, SubtitleFormat, SubtitleGenerationStatus } from '../types';
 import { AppError } from '../middleware/errorHandler';
 import { createDocumentPermissions } from '../config/appwrite';
 
+// Helper function for delays (copy from videoService)
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Constants for locking (copy from videoService)
+const LOCK_TIMEOUT_MS = 5000; // 5 seconds lock expiration
+const LOCK_RETRY_DELAY_MS = 100; // Wait 100ms before retrying cache read
+const MAX_LOCK_RETRIES = 5; // Max attempts to get data after waiting for lock
+const SUBTITLE_LIST_CACHE_KEY_PREFIX = 'subtitle:list:'; // Prefix for list cache keys
+
 /**
- * Service for orchestrating subtitle generation and managing subtitle metadata.
- * Delegates I/O and processing tasks to specific utility modules.
+ * Service for orchestrating subtitle generation and managing subtitle metadata,
+ * including caching with stampede protection.
  */
 export class SubtitleService {
+
+  // --- Private Lock Helper --- (Copy from videoService)
+  private async acquireLock(key: string): Promise<boolean> {
+    const lockKey = `${key}:lock`;
+    try {
+      const result = await redisClient.set(lockKey, 'locked', 'PX', LOCK_TIMEOUT_MS, 'NX');
+      return result === 'OK';
+    } catch (error) {
+      console.error(`[SubtitleService] Error acquiring lock for key ${key}:`, error);
+      return false;
+    }
+  }
+
+  private async releaseLock(key: string): Promise<void> {
+    const lockKey = `${key}:lock`;
+    try {
+      await redisClient.del(lockKey);
+    } catch (error) {
+      console.error(`[SubtitleService] Error releasing lock for key ${key}:`, error);
+    }
+  }
+  // --- End Lock Helper ---
 
   /**
    * Orchestrates the generation of subtitles for a video.
@@ -164,6 +198,26 @@ export class SubtitleService {
             videoDuration,
             subtitleName // Pass the subtitle name
         );
+
+        // Invalidate list cache on successful creation
+        try {
+           const listCacheKey = `${SUBTITLE_LIST_CACHE_KEY_PREFIX}${videoId}`;
+           // Use a method that maps to _deleteCacheValue, assuming deleteCachedSubtitle does this
+           await redisService.deleteCachedSubtitle(listCacheKey);
+           console.log(`[SubtitleService] Invalidated subtitle list cache for video ${videoId}`);
+        } catch (cacheError: any) {
+            console.warn(`[SubtitleService] Failed to invalidate list cache after subtitle creation for video ${videoId}: ${cacheError.message}`);
+        }
+
+        // Optionally cache the newly created subtitle directly
+        try {
+            // Assuming cacheSubtitle handles key generation based on subtitle ID or videoId+lang
+            await redisService.cacheSubtitle(videoId, subtitle);
+            console.log(`[SubtitleService] Cached newly created subtitle ${subtitle.id}`);
+        } catch (cacheError: any) {
+            console.warn(`[SubtitleService] Failed to cache newly created subtitle ${subtitle.id}: ${cacheError.message}`);
+        }
+
         return subtitle;
     } catch (error: any) {
         console.error(`[SubtitleService] Error during Appwrite save process: ${error.message}`);
@@ -246,54 +300,221 @@ export class SubtitleService {
 
   // --- Methods for getting/deleting subtitles (Interact directly with DB/Storage via Appwrite SDK or Utils) ---
 
-  async getSubtitleById(id: string): Promise<Subtitle> {
-    try {
-      const subtitle = await databases.getDocument(DATABASE_ID, SUBTITLES_COLLECTION_ID, id);
-      return {
-        id: subtitle.$id,
-        videoId: subtitle.videoId,
-        format: subtitle.format,
-        fileId: subtitle.fileId,
-        language: subtitle.language,
-        name: subtitle.name,
-        fileSize: subtitle.fileSize,
-        mimeType: subtitle.mimeType,
-        status: subtitle.status,
-        processingMetadata: subtitle.processingMetadata,
-        generatedAt: subtitle.generatedAt ? new Date(subtitle.generatedAt) : undefined,
-        createdAt: new Date(subtitle.$createdAt),
-        updatedAt: new Date(subtitle.$updatedAt)
-      };
-    } catch (error: any) {
-      throw new AppError(`Subtitle with ID ${id} not found`, 404);
+  async getSubtitleById(id: string, skipCache: boolean = false): Promise<Subtitle> {
+    // Note: redisService.getCachedSubtitle likely uses a key like "subtitle:<id>" internally
+    const cacheKey = `subtitle:${id}`; // Key for locking purposes
+
+    // 1. Try cache
+    if (!skipCache) {
+       try {
+           const cachedSubtitle = await redisService.getCachedSubtitle(id); // Use public method
+           if (cachedSubtitle) {
+               console.log(`[SubtitleService] Cache hit for subtitle ID: ${id}`);
+               return cachedSubtitle as Subtitle; // Assuming cache stores the correct type
+           }
+           console.log(`[SubtitleService] Cache miss for subtitle ID: ${id}`);
+       } catch (error: any) {
+           if (error instanceof CacheUnavailableError) {
+               console.warn(`[SubtitleService] Cache unavailable for getSubtitleById(${id}), fetching from DB.`);
+           } else {
+               console.error(`[SubtitleService] Non-critical cache error during getSubtitleById(${id}): ${error.message}`, error);
+           }
+           // Fall through
+       }
+    } else {
+       console.log(`[SubtitleService] Skipping cache for subtitle ID: ${id}`);
+    }
+
+    // 2. Acquire lock
+    const lockAcquired = await this.acquireLock(cacheKey);
+
+    if (lockAcquired) {
+       console.log(`[SubtitleService] Lock acquired for ${cacheKey}, fetching from DB.`);
+       try {
+           // Double-check cache after acquiring lock
+           const cachedSubtitleAgain = await redisService.getCachedSubtitle(id);
+           if (cachedSubtitleAgain) {
+               console.log(`[SubtitleService] Cache hit for subtitle ID: ${id} after acquiring lock.`);
+               await this.releaseLock(cacheKey); // Release lock before returning
+               return cachedSubtitleAgain as Subtitle;
+           }
+
+           // Fetch from DB
+           const subtitleDoc = await databases.getDocument(DATABASE_ID, SUBTITLES_COLLECTION_ID, id);
+
+           const subtitleData: Subtitle = { // Map data
+               id: subtitleDoc.$id,
+               videoId: subtitleDoc.videoId,
+               format: subtitleDoc.format,
+               fileId: subtitleDoc.fileId,
+               language: subtitleDoc.language,
+               name: subtitleDoc.name,
+               fileSize: subtitleDoc.fileSize,
+               mimeType: subtitleDoc.mimeType,
+               status: subtitleDoc.status,
+               processingMetadata: subtitleDoc.processingMetadata,
+               generatedAt: subtitleDoc.generatedAt ? new Date(subtitleDoc.generatedAt) : undefined,
+               createdAt: new Date(subtitleDoc.$createdAt),
+               updatedAt: new Date(subtitleDoc.$updatedAt)
+           };
+
+           // Cache the result
+           try {
+               // Pass videoId and subtitle data to the public caching method
+               await redisService.cacheSubtitle(subtitleData.videoId, subtitleData);
+               console.log(`[SubtitleService] DB result cached for subtitle ID: ${id}`);
+           } catch (cacheError: any) {
+               console.error(`[SubtitleService] Failed to cache DB result for subtitle ${id}: ${cacheError.message}`);
+           }
+
+           return subtitleData;
+
+       } catch (dbError: any) {
+           console.error(`[SubtitleService] Error fetching subtitle ${id} from DB:`, dbError);
+           if (dbError instanceof AppwriteException && dbError.code === 404) {
+               throw new AppError(`Subtitle with ID ${id} not found`, 404);
+           }
+           throw new AppError(`Failed to fetch subtitle ${id} from database: ${dbError.message || 'Unknown error'}`, 500);
+       } finally {
+           await this.releaseLock(cacheKey);
+           console.log(`[SubtitleService] Lock released for ${cacheKey}`);
+       }
+    } else {
+       // 3. Lock not acquired, wait and retry cache
+       console.log(`[SubtitleService] Could not acquire lock for ${cacheKey}, waiting...`);
+       for (let i = 0; i < MAX_LOCK_RETRIES; i++) {
+           await delay(LOCK_RETRY_DELAY_MS);
+           try {
+               const cachedSubtitle = await redisService.getCachedSubtitle(id);
+               if (cachedSubtitle) {
+                   console.log(`[SubtitleService] Cache hit for subtitle ID: ${id} after waiting.`);
+                   return cachedSubtitle as Subtitle;
+               }
+               console.log(`[SubtitleService] Still cache miss for subtitle ID: ${id} after wait attempt ${i + 1}`);
+           } catch (error: any) {
+               if (error instanceof CacheUnavailableError) {
+                   console.error(`[SubtitleService] Cache became unavailable while waiting for lock on ${cacheKey}.`);
+                   throw new AppError(`Cache unavailable while fetching subtitle ${id}`, 503);
+               }
+               console.error(`[SubtitleService] Non-critical cache error while waiting for lock on ${cacheKey}: ${error.message}`);
+           }
+       }
+       console.error(`[SubtitleService] Failed to get subtitle ${id} from cache after waiting.`);
+       throw new AppError(`Failed to retrieve subtitle ${id} after lock contention`, 503);
     }
   }
 
-  async getSubtitlesByVideoId(videoId: string): Promise<Subtitle[]> {
-     try {
-      const response = await databases.listDocuments(DATABASE_ID, SUBTITLES_COLLECTION_ID, [`videoId=${videoId}`]);
-      return response.documents.map(doc => ({
-        id: doc.$id,
-        videoId: doc.videoId,
-        format: doc.format,
-        fileId: doc.fileId,
-        language: doc.language,
-        name: doc.name,
-        fileSize: doc.fileSize,
-        mimeType: doc.mimeType,
-        status: doc.status,
-        processingMetadata: doc.processingMetadata,
-        generatedAt: doc.generatedAt ? new Date(doc.generatedAt) : undefined,
-        createdAt: new Date(doc.$createdAt),
-        updatedAt: new Date(doc.$updatedAt)
-      }));
-    } catch (error: any) {
-      throw new AppError(`Failed to get subtitles for video ${videoId}`, 500);
+  async getSubtitlesByVideoId(videoId: string, skipCache: boolean = false): Promise<Subtitle[]> {
+    const cacheKey = `${SUBTITLE_LIST_CACHE_KEY_PREFIX}${videoId}`;
+
+    // 1. Try cache
+    if (!skipCache) {
+       try {
+           // Need a specific method in redisService or use _getCacheValue
+           const cachedResult = await redisService['_getCacheValue']<Subtitle[]>(cacheKey); // Using private method
+           if (cachedResult && Array.isArray(cachedResult)) {
+               console.log(`[SubtitleService] Cache hit for subtitle list for video: ${videoId}`);
+               return cachedResult;
+           }
+           console.log(`[SubtitleService] Cache miss for subtitle list for video: ${videoId}`);
+       } catch (error: any) {
+           if (error instanceof CacheUnavailableError) {
+               console.warn(`[SubtitleService] Cache unavailable for getSubtitlesByVideoId(${videoId}), fetching from DB.`);
+           } else {
+               console.error(`[SubtitleService] Non-critical cache error during getSubtitlesByVideoId(${videoId}): ${error.message}`, error);
+           }
+           // Fall through
+       }
+    } else {
+       console.log(`[SubtitleService] Skipping cache for subtitle list for video: ${videoId}`);
+    }
+
+    // 2. Acquire lock
+    const lockAcquired = await this.acquireLock(cacheKey);
+
+    if (lockAcquired) {
+       console.log(`[SubtitleService] Lock acquired for ${cacheKey}, fetching list from DB.`);
+       try {
+           // Double-check cache after acquiring lock
+           const cachedResultAgain = await redisService['_getCacheValue']<Subtitle[]>(cacheKey);
+           if (cachedResultAgain && Array.isArray(cachedResultAgain)) {
+               console.log(`[SubtitleService] Cache hit for subtitle list ${videoId} after acquiring lock.`);
+               await this.releaseLock(cacheKey); // Release lock
+               return cachedResultAgain;
+           }
+
+           // Fetch from DB - Use Appwrite Query syntax
+           const response = await databases.listDocuments(
+               DATABASE_ID,
+               SUBTITLES_COLLECTION_ID,
+               [`equal("videoId", "${videoId}")`] // Correct query syntax
+           );
+           const subtitles: Subtitle[] = response.documents.map(doc => ({ // Map data
+               id: doc.$id,
+               videoId: doc.videoId,
+               format: doc.format,
+               fileId: doc.fileId,
+               language: doc.language,
+               name: doc.name,
+               fileSize: doc.fileSize,
+               mimeType: doc.mimeType,
+               status: doc.status,
+               processingMetadata: doc.processingMetadata,
+               generatedAt: doc.generatedAt ? new Date(doc.generatedAt) : undefined,
+               createdAt: new Date(doc.$createdAt),
+               updatedAt: new Date(doc.$updatedAt)
+           }));
+
+           // Cache the result
+           try {
+               // Use the private setter directly as we have the final list
+               await redisService['_setCacheValue'](cacheKey, subtitles);
+               console.log(`[SubtitleService] DB result cached for subtitle list ${videoId}`);
+           } catch (cacheError: any) {
+               console.error(`[SubtitleService] Failed to cache DB result for subtitle list ${videoId}: ${cacheError.message}`);
+           }
+
+           return subtitles;
+
+       } catch (dbError: any) {
+           console.error(`[SubtitleService] Error fetching subtitles for video ${videoId} from DB:`, dbError);
+           throw new AppError(`Failed to fetch subtitles for video ${videoId}: ${dbError.message || 'Unknown error'}`, 500);
+       } finally {
+           await this.releaseLock(cacheKey);
+           console.log(`[SubtitleService] Lock released for ${cacheKey}`);
+       }
+    } else {
+       // 3. Lock not acquired, wait and retry cache
+       console.log(`[SubtitleService] Could not acquire lock for ${cacheKey}, waiting...`);
+       for (let i = 0; i < MAX_LOCK_RETRIES; i++) {
+           await delay(LOCK_RETRY_DELAY_MS);
+           try {
+               const cachedResult = await redisService['_getCacheValue']<Subtitle[]>(cacheKey);
+               if (cachedResult && Array.isArray(cachedResult)) {
+                   console.log(`[SubtitleService] Cache hit for subtitle list ${videoId} after waiting.`);
+                   return cachedResult;
+               }
+               console.log(`[SubtitleService] Still cache miss for subtitle list ${videoId} after wait attempt ${i + 1}`);
+           } catch (error: any) {
+               if (error instanceof CacheUnavailableError) {
+                   console.error(`[SubtitleService] Cache became unavailable while waiting for lock on ${cacheKey}.`);
+                   throw new AppError(`Cache unavailable while fetching subtitle list for ${videoId}`, 503);
+               }
+               console.error(`[SubtitleService] Non-critical cache error while waiting for lock on ${cacheKey}: ${error.message}`);
+           }
+       }
+       console.error(`[SubtitleService] Failed to get subtitle list for ${videoId} from cache after waiting.`);
+       throw new AppError(`Failed to retrieve subtitle list for ${videoId} after lock contention`, 503);
     }
   }
 
   async getSubtitleContent(fileId: string): Promise<string> {
     try {
+        // TODO: Consider caching subtitle content if frequently accessed and not excessively large
+        // const cacheKey = `subtitle:content:${fileId}`;
+        // let content = await redisService.getCachedSubtitleContent(fileId); // Hypothetical method
+        // if (content) return content;
+
         // Use Appwrite SDK's direct file access instead of fetch
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), AUDIO_PROCESSING.SUBTITLE_FETCH_TIMEOUT);
@@ -329,6 +550,21 @@ export class SubtitleService {
 
       await deleteSubtitleFileFromAppwrite(subtitleFileId);
       await deleteSubtitleDocumentFromAppwrite(id);
+
+      // Invalidate caches
+      try {
+          // Fetch subtitle before deleting to get videoId for list invalidation
+          // Use skipCache=true as we are deleting it anyway
+          const subtitle = await this.getSubtitleById(id, true);
+          await redisService.deleteCachedSubtitle(id); // Invalidate specific subtitle cache (uses ID)
+          const listCacheKey = `${SUBTITLE_LIST_CACHE_KEY_PREFIX}${subtitle.videoId}`;
+          // Use private method to delete the list key directly
+          await redisService['_deleteCacheValue'](listCacheKey);
+          console.log(`[SubtitleService] Invalidated cache for subtitle ${id} and list ${listCacheKey}`);
+      } catch (fetchOrCacheError: any) {
+           // Log error if fetching subtitle for invalidation failed or if invalidation itself failed
+           console.warn(`[SubtitleService] Failed during cache invalidation process for subtitle ${id}: ${fetchOrCacheError.message}`);
+      }
 
       console.log(`[SubtitleService] Successfully deleted subtitle ${id}`);
     } catch (error: any) {
@@ -564,6 +800,21 @@ export class SubtitleService {
       );
 
       console.log(`[SubtitleService] Updated subtitle document ${documentId} status to ${status}`);
+
+      // Invalidate relevant caches on status update
+      try {
+          // Fetch fresh data to get videoId for list invalidation, skip cache as data might be stale
+          const subtitle = await this.getSubtitleById(documentId, true);
+          await redisService.deleteCachedSubtitle(documentId); // Invalidate specific subtitle cache (uses ID)
+          const listCacheKey = `${SUBTITLE_LIST_CACHE_KEY_PREFIX}${subtitle.videoId}`;
+          // Use private method to delete the list key directly
+          await redisService['_deleteCacheValue'](listCacheKey);
+          console.log(`[SubtitleService] Invalidated cache for subtitle ${documentId} and list ${listCacheKey} after status update`);
+      } catch (fetchOrCacheError: any) {
+           // Log error if fetching subtitle for invalidation failed or if invalidation itself failed
+           console.warn(`[SubtitleService] Failed during cache invalidation after status update for subtitle ${documentId}: ${fetchOrCacheError.message}`);
+      }
+
     } catch (error: any) {
       console.error(`[SubtitleService] Failed to update subtitle status: ${error.message}`);
       throw new AppError(`Failed to update subtitle status: ${error.message}`, 500);
