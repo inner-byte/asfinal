@@ -3,7 +3,7 @@
 
 ### 1. Executive Summary
 
-The AI-Powered Subtitle Generator is a web application designed to provide accurate, real-time subtitle generation for video content. Built with a modern tech stack featuring Node.js backend and Next.js frontend, this application leverages the advanced capabilities of Google's Gemini-flash-2.0 model via the Vertex API to deliver high-precision subtitles with accurate timestamps.
+The AI-Powered Subtitle Generator is a web application designed to provide accurate, real-time subtitle generation for video content. Built with a modern tech stack featuring Node.js backend and Next.js frontend, this application leverages the advanced capabilities of Google's Gemini-flash-2.0 model via the Developer API to deliver high-precision subtitles with accurate timestamps.
 
 ### 2. Product Overview
 
@@ -24,7 +24,7 @@ The AI-Powered Subtitle Generator is a web application designed to provide accur
   - `multer` - File upload handling
   - `bullmq` - Redis-based job queue
   - `ioredis` - Redis client
-  - `@google-cloud/aiplatform` - Vertex AI integration
+  - `@google/generative-ai` - Google Gemini Developer API integration
   - `appwrite` - Database and storage
   - `ffmpeg-static` - Video processing
   - `joi` or `zod` - Input validation
@@ -45,7 +45,7 @@ The AI-Powered Subtitle Generator is a web application designed to provide accur
 - **Cache & Queue**: Redis with BullMQ
 
 #### External APIs
-- **AI Model**: Gemini-flash-2.0 via Google Vertex AI
+- **AI Model**: Gemini-flash-2.0 via Google Gemini Developer API
 - **Video Processing**: FFmpeg for timestamp alignment
 
 ### 4. Core Features
@@ -58,7 +58,7 @@ The AI-Powered Subtitle Generator is a web application designed to provide accur
 - **Validation**: MIME type, file size, duration checks
 
 #### 4.2 Subtitle Generation
-- **AI Model**: Gemini-flash-2.0 via Vertex API
+- **AI Model**: Gemini-flash-2.0 via Developer API
 - **Output Format**: VTT (WebVTT) for web player compatibility
 - **Timestamp Accuracy**: ±0.1 to ±3 seconds tolerance
 - **Processing**: Background jobs via Redis queue
@@ -150,7 +150,7 @@ The AI-Powered Subtitle Generator is a web application designed to provide accur
 - **Storage Duration**: Configurable retention period
 
 #### API Limitations
-- **Vertex AI**: Rate limits and quotas as per Google Cloud
+- **Google Gemini Developer API**: Rate limits and quotas as per Google's API terms
 - **Gemini Model**: Input size limitations
 - **Request Timeouts**: 30 seconds for API calls
 
@@ -158,7 +158,7 @@ The AI-Powered Subtitle Generator is a web application designed to provide accur
 - **Node.js**: Version 18 or higher
 - **Redis**: For job queue and caching
 - **Appwrite**: Database and storage services
-- **Google Cloud**: Vertex AI access
+- **Google API Access**: Gemini Developer API access
 
 ### 9. Success Metrics
 
@@ -192,7 +192,7 @@ The AI-Powered Subtitle Generator is a web application designed to provide accur
 ### 11. Risk Assessment
 
 #### Technical Risks
-- **API Dependencies**: Vertex AI service availability
+- **API Dependencies**: Google Gemini Developer API service availability
 - **Large File Processing**: Memory and performance constraints
 - **Network Latency**: Impact on real-time features
 - **Browser Compatibility**: Video player support

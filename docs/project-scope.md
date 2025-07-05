@@ -22,7 +22,7 @@
   - Streaming upload for large files
 
 - **AI-Powered Subtitle Generation**
-  - Integration with Google Gemini-flash-2.0 via Vertex AI
+  - Integration with Google Gemini-flash-2.0 via Developer API
   - Automatic timestamp generation
   - VTT format output for web compatibility
   - Accuracy tolerance: ±0.1 to ±3 seconds
@@ -75,7 +75,7 @@
 - Efficient data relationships
 
 **External Integrations**
-- Google Vertex AI (Gemini-flash-2.0)
+- Google Gemini Developer API (Gemini-flash-2.0)
 - FFmpeg for video processing
 - Plyr for video playback
 - File format conversion tools
@@ -95,7 +95,7 @@
 - Custom AI model training
 - Enterprise SSO integration
 - Advanced analytics and reporting
-- Third-party API integrations (beyond Vertex AI)
+- Third-party API integrations (beyond Google Gemini Developer API)
 - Content moderation features
 - Advanced security features (beyond basic validation)
 
@@ -119,24 +119,8 @@
 - **Process Manager**: PM2 for production
 
 ##### Key Dependencies
-```json
-{
-  "express": "^4.18.x",
-  "typescript": "^5.x",
-  "cors": "^2.8.x",
-  "helmet": "^7.x",
-  "multer": "^1.4.x",
-  "bullmq": "^4.x",
-  "ioredis": "^5.x",
-  "appwrite": "^13.x",
-  "@google-cloud/aiplatform": "^3.x",
-  "ffmpeg-static": "^5.x",
-  "joi": "^17.x",
-  "express-rate-limit": "^6.x",
-  "express-validator": "^7.x",
-  "dotenv": "^16.x"
-}
-```
+
+The project uses Express, TypeScript, CORS, Helmet, Multer, BullMQ, IORedis, Appwrite, Google Generative AI, FFmpeg, Joi, Express Rate Limit, Express Validator, and Dotenv.
 
 ##### Development Tools
 - **Testing**: Jest, Supertest
@@ -156,20 +140,8 @@
 - **Build Tool**: Webpack 5, Turbopack
 
 ##### Key Dependencies
-```json
-{
-  "next": "^15.x",
-  "react": "^19.x",
-  "react-dom": "^19.x",
-  "typescript": "^5.x",
-  "tailwindcss": "^4.x",
-  "plyr": "^3.x",
-  "axios": "^1.x",
-  "react-hook-form": "^7.x",
-  "react-query": "^5.x",
-  "framer-motion": "^10.x"
-}
-```
+
+The project uses Next.js, React, TypeScript, TailwindCSS, Plyr, Axios, React Hook Form, React Query, and Framer Motion.
 
 ##### Development Tools
 - **Testing**: Jest, React Testing Library, Playwright
@@ -187,7 +159,7 @@
 - **Queue**: BullMQ with Redis backend
 
 ##### External Services
-- **AI Processing**: Google Vertex AI (Gemini-flash-2.0)
+- **AI Processing**: Google Gemini Developer API (Gemini-flash-2.0)
 - **Video Processing**: FFmpeg
 - **Cloud Storage**: Google Cloud Storage (via Appwrite)
 - **Monitoring**: Built-in health checks
@@ -229,104 +201,30 @@
 #### 4.2 API Endpoints Scope
 
 ##### Video Management
-```
-POST   /api/videos/upload           # Upload video file
-GET    /api/videos/:id              # Get video metadata
-GET    /api/videos/:id/stream       # Stream video content
-DELETE /api/videos/:id              # Delete video
-GET    /api/videos                  # List videos (optional)
-```
+The API provides endpoints for video upload, metadata retrieval, content streaming, deletion, and optional video listing.
 
 ##### Subtitle Operations
-```
-POST   /api/subtitles/generate      # Generate subtitles
-GET    /api/subtitles/:id           # Get subtitle content
-GET    /api/subtitles/:id/export    # Export subtitles
-PUT    /api/subtitles/:id           # Update subtitle timing
-DELETE /api/subtitles/:id           # Delete subtitles
-```
+The API includes endpoints for subtitle generation, content retrieval, export, timing updates, and deletion.
 
 ##### Job Management
-```
-GET    /api/jobs/:id                # Get job status
-DELETE /api/jobs/:id                # Cancel job
-GET    /api/jobs/:id/progress       # Get job progress
-GET    /api/jobs                    # List jobs (optional)
-```
+The API offers endpoints for job status checking, cancellation, progress tracking, and optional job listing.
 
 ##### System Operations
-```
-GET    /health                      # Health check
-GET    /api/system/status           # System status
-POST   /api/system/cleanup          # Cleanup temporary files
-```
+The API provides health check, system status, and cleanup functionality.
 
 #### 4.3 Data Models Scope
 
 ##### Video Entity
-```typescript
-interface VideoDocument {
-  id: string;
-  filename: string;
-  originalName: string;
-  size: number;
-  duration: number;
-  format: string;
-  mimeType: string;
-  status: 'uploading' | 'processing' | 'ready' | 'error';
-  createdAt: Date;
-  updatedAt: Date;
-  metadata: {
-    width: number;
-    height: number;
-    bitrate: number;
-    codec: string;
-    frameRate: number;
-  };
-}
-```
+
+The video entity includes id, filename, original name, size, duration, format, MIME type, status, timestamps, and metadata with video properties.
 
 ##### Subtitle Entity
-```typescript
-interface SubtitleDocument {
-  id: string;
-  videoId: string;
-  content: string;
-  format: 'vtt' | 'srt' | 'ass';
-  language: string;
-  accuracy: number;
-  processingTime: number;
-  status: 'generating' | 'ready' | 'error';
-  createdAt: Date;
-  updatedAt: Date;
-  metadata: {
-    modelVersion: string;
-    adjustmentApplied: boolean;
-    timingAccuracy: number;
-  };
-}
-```
+
+The subtitle entity includes id, video reference, content, format, language, accuracy, processing time, status, timestamps, and metadata with model version and timing information.
 
 ##### Job Entity
-```typescript
-interface JobDocument {
-  id: string;
-  type: 'subtitle-generation' | 'format-conversion';
-  status: 'pending' | 'processing' | 'completed' | 'failed';
-  progress: number;
-  videoId: string;
-  subtitleId?: string;
-  error?: string;
-  createdAt: Date;
-  startedAt?: Date;
-  completedAt?: Date;
-  metadata: {
-    attempts: number;
-    estimatedDuration: number;
-    actualDuration?: number;
-  };
-}
-```
+
+The job entity includes id, type, status, progress, video and subtitle references, error information, timestamps, and metadata with attempt and duration tracking.
 
 ### 5. Non-Functional Scope
 
@@ -402,7 +300,7 @@ interface JobDocument {
 - **Rate Limits**: API endpoints have rate limiting
 - **Concurrent Requests**: Limited concurrent processing
 - **Timeout Limits**: 30-second timeout for API calls
-- **Vertex AI Quotas**: Subject to Google Cloud quotas
+- **Google Gemini Developer API Quotas**: Subject to Google API quotas
 
 ##### Browser Compatibility
 - **Modern Browsers**: Chrome, Firefox, Safari, Edge (latest versions)
@@ -430,7 +328,7 @@ interface JobDocument {
 - **Docker Support**: Container-based deployment
 - **Node.js Runtime**: Node.js 18+ required
 - **Redis Instance**: Redis server for queue management
-- **Network Access**: Internet access for Vertex AI
+- **Network Access**: Internet access for Google Gemini Developer API
 - **Storage Space**: Adequate storage for video files
 
 ##### Environment Requirements
@@ -477,7 +375,7 @@ interface JobDocument {
 - Node.js Express server with TypeScript
 - RESTful API implementation
 - Background job processing system
-- Integration with Appwrite and Vertex AI
+- Integration with Appwrite and Google Gemini Developer API
 - Comprehensive error handling and logging
 
 ##### Frontend Application
@@ -521,7 +419,7 @@ interface JobDocument {
 ##### Phase 1: Foundation (Weeks 1-4)
 - Project setup and environment configuration
 - Basic video upload functionality
-- Initial Vertex AI integration
+- Initial Google Gemini Developer API integration
 - Basic UI with video player
 
 ##### Phase 2: Core Features (Weeks 5-8)
